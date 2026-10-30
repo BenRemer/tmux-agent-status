@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-beta.2
+
+- Recognize Antigravity's `agy` command by default, alongside Codex and Claude.
+  Activity still requires a matching busy title or an activity-reporting integration.
+
 ## 0.1.0-beta.1
 
 First public beta package, prepared October 30, 2026.

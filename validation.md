@@ -1,6 +1,6 @@
 # Validation record
 
-Beta `0.1.0-beta.1`, verified locally on Linux on October 30, 2026.
+Beta `0.1.0-beta.2`, verified locally on Linux on October 30, 2026.
 Pending checks are listed explicitly.
 
 ## Compatibility
@@ -15,6 +15,7 @@ Pending checks are listed explicitly.
 | macOS | CI configured; first hosted run pending |
 | Codex | Live desktop use with build 0.166.0.827; README settings checked against the public 0.166.0 configuration schema |
 | Claude Code 2.1.314, public distribution | Strict adapter validation and all 7 event tests passed with a fresh configuration directory |
+| Antigravity (`agy`) | Command recognition and busy/idle titles covered by synthetic integration tests; live CLI not tested |
 | Claude in live desktop use | User confirmed both activity and completion notifications work |
 
 The public Claude runtime was installed separately for testing. Validation and

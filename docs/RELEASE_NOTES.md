@@ -1,4 +1,8 @@
-# tmux-agent-status 0.1.0-beta.1
+# tmux-agent-status 0.1.0-beta.2
+
+This update adds Antigravity (`agy`) to the default recognized commands.
+Antigravity still needs a configured activity title or integration to report
+its running state; see the README. Live Antigravity behavior remains unverified.
 
 See which agent tabs are working and which have a notification, without
 replacing your tmux theme.

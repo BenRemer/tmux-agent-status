@@ -183,6 +183,16 @@ class Integration(unittest.TestCase):
         self.assertEqual("1", self.s.eval(a, "#{pane_dead}"))
         self.assertEqual("0", self.s.eval(a, "#{E:@agent-status-window-busy}"))
 
+        for index, name in enumerate(("claude", "agy"), start=2):
+            with self.subTest(agent=name):
+                pane = self.s.agent(f"A:{index}", name=name)
+                self.assertEqual("1", self.s.eval(pane, "#{E:@agent-status-internal-pane}"))
+                self.assertEqual("", self.s.eval(pane, PUBLIC))
+                self.s.busy(pane)
+                self.assertEqual("⚙", self.s.eval(pane, PUBLIC))
+                self.s.busy(pane, False)
+                self.assertEqual("", self.s.eval(pane, PUBLIC))
+
     def test_claude_static_title_activity_and_stale_state(self):
         a = self.s.agent(name="claude")
         client = self.s.attach("B:0")

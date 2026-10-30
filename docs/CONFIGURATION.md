@@ -80,7 +80,7 @@ change between beta versions.
 Patterns are extended regular expressions:
 
 ```tmux
-set -g @agent-status-command-pattern '^(codex|claude)$'
+set -g @agent-status-command-pattern '^(codex|claude|agy)$'
 set -g @agent-status-agent-title-pattern '^✳ '
 set -g @agent-status-busy-title-pattern '^(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏) '
 ```

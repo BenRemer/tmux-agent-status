@@ -63,7 +63,7 @@ esac
 
 agent_running_icon=$(agent_input @agent-status-running-icon '⚙')
 agent_bell_icon=$(agent_input @agent-status-bell-icon '🔔')
-agent_command_pattern=$(agent_input @agent-status-command-pattern '^(codex|claude)$')
+agent_command_pattern=$(agent_input @agent-status-command-pattern '^(codex|claude|agy)$')
 agent_title_pattern=$(agent_input @agent-status-agent-title-pattern '^✳ ')
 agent_busy_pattern=$(agent_input @agent-status-busy-title-pattern '^(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏) ')
 agent_running_style=$(agent_input @agent-status-running-style "$agent_running_default")

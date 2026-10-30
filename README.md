@@ -7,7 +7,7 @@ working in another session, and come back when a tab has something for you.
 
 [![Tests](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml/badge.svg)](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Beta](https://img.shields.io/badge/release-0.1.0--beta.1-d29922.svg)](CHANGELOG.md)
+[![Beta](https://img.shields.io/badge/release-0.1.0--beta.2-d29922.svg)](CHANGELOG.md)
 
 ![A selected shell tab, softly highlighted working agent tabs, an amber notification tab, and indicators for other sessions](docs/images/overview.png)
 
@@ -54,7 +54,7 @@ Then [set up your agent](#set-up-your-agent). Do not also add a manual
 ### Without TPM
 
 ```sh
-git clone --branch v0.1.0-beta.1 \
+git clone --branch v0.1.0-beta.2 \
   https://github.com/benremer/tmux-agent-status.git \
   ~/.tmux/plugins/tmux-agent-status
 ```
@@ -123,12 +123,26 @@ The adapter is tested with **public Claude Code 2.1.314**. See
 and uninstall instructions. Earlier versions without mods support cannot
 load this adapter.
 
+### Antigravity (`agy`)
+
+`agy` is recognized by default. Antigravity needs a configured title command
+to publish activity in its terminal title; command recognition alone does not
+mark it as running. Use a title matching the configured busy-title pattern,
+or an integration following the
+[activity-reporting contract](docs/CONFIGURATION.md#reporting-activity-from-another-agent).
+See Antigravity's [title configuration](https://antigravity.google/docs/cli/title/).
+
+Enable `"notifications": true` in `~/.gemini/antigravity-cli/settings.json`
+for terminal bells, as described in its
+[configuration reference](https://antigravity.google/docs/cli/reference/).
+Live Antigravity activity detection has not yet been verified.
+
 ### Other agents
 
 Names and title patterns are configurable. For example:
 
 ```tmux
-set -g @agent-status-command-pattern '^(codex|claude|my-agent)$'
+set -g @agent-status-command-pattern '^(codex|claude|agy|my-agent)$'
 ```
 
 A matching name alone does not mean an agent is working. It also needs a
@@ -214,7 +228,7 @@ Set options before the plugin loads, then reload to apply them.
 | `@agent-status-preset` | `none`; opt into `compact` |
 | `@agent-status-running-icon` | `⚙` |
 | `@agent-status-bell-icon` | `🔔` |
-| `@agent-status-command-pattern` | `^(codex\|claude)$` |
+| `@agent-status-command-pattern` | `^(codex\|claude\|agy)$` |
 | `@agent-status-agent-title-pattern` | `^✳ ` |
 | `@agent-status-busy-title-pattern` | Braille spinner followed by a space |
 | `@agent-status-running-style` | Inherit in manual mode; soft teal in compact mode |

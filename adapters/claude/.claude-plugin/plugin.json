@@ -1,6 +1,6 @@
 {
   "name": "tmux-agent-status",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Report Claude's active turns to the tmux-agent-status plugin.",
   "author": { "name": "Ben Remer" },
   "license": "MIT",
