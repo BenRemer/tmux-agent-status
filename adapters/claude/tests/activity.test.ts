@@ -30,7 +30,7 @@ test('main turn reports busy, child completion does not clear it, cancellation d
   expect(writes.length).toBe(2)
   expect(writes[1]).toEqual([
     'tmux', '-S', '/tmp/socket with spaces,and commas',
-    'set-option', '-p', '-t', '%42', '@agent-status-busy-command', 'claude',
+    'set-option', '-p', '-F', '-t', '%42', '@agent-status-busy-command', '#{pane_current_command}',
   ])
   await $.turn.complete({ turnId: 'main', isAborted: true, answer: '', durationMs: 1 })
   expect(writes[2][writes[2].length - 1]).toBe('')

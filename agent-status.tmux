@@ -87,6 +87,15 @@ for agent_pattern in "$agent_command_pattern" "$agent_title_pattern" "$agent_bus
     fi
 done
 
+# A literal bg/fg color from a style, for tinting themes with inline colors.
+agent_style_color() {
+    agent_color=$(printf '%s\n' "$1" | tr ', ' '\n\n' | sed -n "s/^$2=//p" | tail -n 1)
+    case "$agent_color" in
+        *[!#A-Za-z0-9]*) ;;
+        *) printf '%s' "$agent_color" ;;
+    esac
+}
+
 # Resolved defaults never overwrite user input options.
 agent_tmux set-option -g @agent-status-internal-running-icon "$agent_running_icon"
 agent_tmux set-option -g @agent-status-internal-bell-icon "$agent_bell_icon"
@@ -95,6 +104,10 @@ agent_tmux set-option -g @agent-status-internal-title-pattern "$agent_title_patt
 agent_tmux set-option -g @agent-status-internal-busy-pattern "$agent_busy_pattern"
 agent_tmux set-option -g @agent-status-internal-running-style "$agent_running_style"
 agent_tmux set-option -g @agent-status-internal-bell-style "$agent_bell_style"
+agent_tmux set-option -g @agent-status-internal-running-bg "$(agent_style_color "$agent_running_style" bg)"
+agent_tmux set-option -g @agent-status-internal-running-fg "$(agent_style_color "$agent_running_style" fg)"
+agent_tmux set-option -g @agent-status-internal-bell-bg "$(agent_style_color "$agent_bell_style" bg)"
+agent_tmux set-option -g @agent-status-internal-bell-fg "$(agent_style_color "$agent_bell_style" fg)"
 agent_tmux source-file "$agent_dir/agent-status.conf"
 
 # Shared functions and socket selection stay in this process.

@@ -6,6 +6,13 @@
   into the running cog without changing completion bells.
 - Document tmux activity popups and load order with tmux-power.
 - Run the existing CI checks on pushes to the public development branch.
+- The compact preset now works with themes that draw tabs with inline colors,
+  such as powerline layouts: the tab body and its separators take the running
+  or bell accent, and the icon is placed inside the tab before its closing
+  separator. Layouts it cannot read keep the previous behavior.
+- The Claude adapter reports the pane's actual foreground command, so activity
+  works when Claude runs under a launcher such as `toolbox-exec`.
+- The integration tests run on macOS.
 
 ## 0.1.0-beta.2
 

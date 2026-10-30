@@ -14,10 +14,12 @@ async function reportActivity($, busy) {
         : null;
     }
     if (!connection || reported === busy) return;
+    // Record the pane's own foreground command, since a launcher such as
+    // toolbox-exec can run Claude under another name.
     const result = await $.process.run([
       'tmux', '-S', connection.socket,
-      'set-option', '-p', '-t', connection.pane,
-      '@agent-status-busy-command', busy ? 'claude' : '',
+      'set-option', '-p', '-F', '-t', connection.pane,
+      '@agent-status-busy-command', busy ? '#{pane_current_command}' : '',
     ]);
     if (result.exitCode === 0) reported = busy;
   } catch {

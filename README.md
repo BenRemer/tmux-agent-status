@@ -29,8 +29,8 @@ No daemon, transcript scraping, model requests, or shell polling during status
 refreshes. The core uses native tmux formats; optional adapters report Claude
 turn events or Antigravity's activity title.
 
-> **Beta:** tmux 3.4+ is required. Linux is locally verified. macOS CI is
-> configured but its first hosted run is still pending. See the precise
+> **Beta:** tmux 3.4+ is required. Linux is locally verified; macOS is locally
+> verified for unreleased changes, and hosted macOS CI is pending. See the precise
 > [compatibility and validation record](validation.md).
 
 ## Install

@@ -1,6 +1,7 @@
 # Validation record
 
-Beta `0.1.0-beta.2`, verified locally on Linux on October 30, 2026.
+Beta `0.1.0-beta.2`, verified locally on Linux on October 30, 2026. Unreleased
+changes were also verified locally on macOS the same day.
 Pending checks are listed explicitly.
 
 ## Development update after beta.2
@@ -22,7 +23,7 @@ The packaged beta.2 results below predate this adapter.
 | tmux 3.6a, upstream release | All 13 integration tests passed |
 | tmux next-3.7, local development build | All 13 integration tests passed |
 | tmux 1.8 | Rejected before changing options |
-| macOS | CI configured; first hosted run pending |
+| macOS 26.7.2, Homebrew tmux 3.7b (unreleased changes) | All 17 integration tests (including the Antigravity adapter test) and all 7 Claude adapter event tests passed locally; running and bell markers checked on a live server with Claude under `toolbox-exec`. Hosted CI run pending |
 | Codex | Live desktop use with build 0.166.0.827; README settings checked against the public 0.166.0 configuration schema |
 | Claude Code 2.1.314, public distribution | Strict adapter validation and all 7 event tests passed with a fresh configuration directory |
 | Antigravity (`agy`) | Command recognition and busy/idle titles covered by synthetic integration tests; live CLI not tested |
@@ -53,6 +54,9 @@ Covered behavior includes:
 - Current-window styling and native bell acknowledgment.
 - Idempotent preset reloads, removal, later theme edits, and existing manual
   tokens.
+- Compact accents and icon placement in a powerline theme with inline colors,
+  and the fallback for a closing style inside a conditional.
+- Activity reported for an agent running under a launcher's command name.
 - Empty overrides, invalid regular expressions, and shell metacharacters in
   configuration values.
 - Corner padding and restoration of adjacent text colors, measured from
@@ -77,6 +81,8 @@ notification refusal.
   reviewed. Captions and sample content are synthetic; the status output
   comes from the plugin. See [image provenance](docs/images/README.md).
 - The public hosted installation and macOS jobs await repository creation.
+- The checks above ran against beta 2 on Linux; they have not been repeated
+  for the unreleased changes.
 
 ## Performance
 
@@ -124,5 +130,7 @@ python3 tests/benchmark.py --baseline /path/to/inline-tmux.conf
   need a separate relay if their outer status bar should reflect inner state.
 - Custom `status-format` layouts require manual token placement.
 - Claude's active turn includes time waiting for tool permission.
-- macOS validation and a fresh install from the public GitHub repository
-  remain pending. Linux results do not establish macOS compatibility.
+- Hosted macOS CI and a fresh install from the public GitHub repository remain
+  pending. macOS has been verified on one local machine only.
+- The compact preset tints inline tab colors only when they are literal colors
+  set before the window index or name.

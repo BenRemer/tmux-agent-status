@@ -23,6 +23,15 @@ PUBLIC = "#{E:@agent-status-window}"
 OTHER = "#{E:@agent-status-other}"
 
 
+def copy_program(destination):
+    # Copy bits only: macOS refuses to copy cat's system file flags.
+    shutil.copy(shutil.which("cat"), destination)
+    if sys.platform == "darwin":
+        # macOS kills a moved system binary until it is signed again.
+        subprocess.run(["codesign", "-f", "-s", "-", str(destination)],
+                       check=True, capture_output=True)
+
+
 class Server:
     def __init__(self, columns=100, rows=30):
         self.columns, self.rows = columns, rows
@@ -37,7 +46,7 @@ class Server:
         # A real executable named codex exercises tmux's process-name detection
         # without launching an AI client or overriding the recognition format.
         self.agent_program = Path(self.fixture_temp.name) / "codex"
-        shutil.copy2(shutil.which("cat"), self.agent_program)
+        copy_program(self.agent_program)
         self.tm("-f", "/dev/null", "new-session", "-d", "-s", "A",
                 "-x", str(columns), "-y", str(rows), "sleep 300")
         self.tm("set-option", "-g", "monitor-bell", "on")
@@ -101,7 +110,7 @@ class Server:
     def agent(self, target="A:1", name="codex"):
         program = Path(self.fixture_temp.name) / name
         if not program.exists():
-            shutil.copy2(shutil.which("cat"), program)
+            copy_program(program)
         command = shlex.quote(str(program))
         pane = self.tm("new-window", "-d", "-t", target, "-P", "-F", "#{pane_id}",
                        command)
@@ -246,6 +255,17 @@ class Integration(unittest.TestCase):
         self.assertEqual("🔔", self.s.eval(a, PUBLIC))
         self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
 
+    def test_claude_under_launcher_reports_its_own_command(self):
+        # Launchers such as toolbox-exec stay in the foreground instead of claude.
+        a = self.s.agent(name="toolbox-exec")
+        self.s.load("compact")
+        self.s.emit(a, "\x1b]2;✳ Claude Code\x07")
+        self.s.tm("set-option", "-p", "-F", "-t", a, "@agent-status-busy-command",
+                  "#{pane_current_command}")
+        self.assertEqual("⚙", self.s.eval(a, PUBLIC))
+        self.s.tm("set-option", "-p", "-t", a, "@agent-status-busy-command", "")
+        self.assertEqual("", self.s.eval(a, PUBLIC))
+
     def test_cross_session_bells_survive_completion_and_reload(self):
         a1 = self.s.agent()
         a2 = self.s.agent("A:2")
@@ -310,6 +330,53 @@ class Integration(unittest.TestCase):
         self.s.load()
         self.s.load("none")
         self.assertEqual("NEW THEME #W", self.s.option("window-status-format"))
+
+    def test_compact_tints_inline_powerline_themes(self):
+        arrow = "\ue0b0"
+        theme = (f"#[fg=#1e2030,bg=#363a4f]{arrow}#[fg=#8bd5ca,bg=#363a4f,bold] #I:#W#F "
+                 f"#[fg=#363a4f,bg=#1e2030,none]{arrow}")
+        current = f"#[fg=#181926,bg=#8bd5ca,bold] #I:#W#F #[fg=#8bd5ca,bg=#1e2030,none]{arrow}"
+        self.s.tm("set-option", "-g", "window-status-format", theme)
+        self.s.tm("set-option", "-g", "window-status-current-format", current)
+        a = self.s.agent()
+        self.s.load("compact")
+        idle = self.s.eval(a, "#{E:window-status-format}")
+        self.assertIn(f"bg=#363a4f]{arrow}", idle)
+        self.assertNotIn("#30464b", idle)
+        self.s.busy(a)
+        busy = self.s.eval(a, "#{E:window-status-format}")
+        # Body, entry and exit separators follow the accent (plus the wrapper).
+        self.assertNotIn("#363a4f", busy)
+        self.assertEqual(4, busy.count("#30464b"))
+        self.assertIn("fg=#cad3f5,bg=#30464b,bold] 1:codex", busy)
+        # The icon stays inside the tab, before the closing separator.
+        self.assertIn(f"1:codex ⚙ #[fg=#30464b,bg=#1e2030,none]{arrow}#[default]", busy)
+        self.s.emit(a, "\a")
+        bell = self.s.eval(a, "#{E:window-status-format}")
+        self.assertEqual(4, bell.count("#eed49f"))
+        self.assertNotIn("#30464b", bell)
+        self.assertIn(" 🔔 #[", bell)
+        self.s.tm("select-window", "-t", "A:1")
+        selected = self.s.eval(a, "#{E:window-status-current-format}")
+        self.assertIn("bg=#8bd5ca,bold] 1:codex", selected)
+        self.assertNotIn("#30464b", selected)
+        applied = self.s.option("window-status-format")
+        self.s.load()
+        self.assertEqual(applied, self.s.option("window-status-format"))
+        self.s.load("none")
+        self.assertEqual(theme, self.s.option("window-status-format"))
+        self.assertEqual(current, self.s.option("window-status-current-format"))
+
+    def test_compact_icon_falls_back_to_the_end(self):
+        # A closing style inside a conditional is not a safe insertion point.
+        theme = "#[bg=#363a4f] #W#{?window_bell_flag,#[bg=red] BELL,}"
+        self.s.tm("set-option", "-g", "window-status-format", theme)
+        self.s.load("compact")
+        self.assertTrue(self.s.option("window-status-format").endswith(
+            "#{E:@agent-status-internal-preset-window-icon}"
+            "#{E:@agent-status-internal-preset-window-close}"))
+        self.s.load("none")
+        self.assertEqual(theme, self.s.option("window-status-format"))
 
     def test_existing_manual_tokens_and_empty_overrides(self):
         self.s.tm("set-option", "-g", "window-status-format", f"#W {PUBLIC}")

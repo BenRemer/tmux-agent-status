@@ -14,6 +14,12 @@ and that the title exposes a working state. An idle agent should not show a
 running icon. Wrappers and executable paths containing spaces can change the
 command name reported by tmux.
 
+A launcher can leave its own name in the foreground; for example, Claude
+installed through Amazon's Toolbox reports `toolbox-exec`. Claude's `✳` title
+still identifies the pane, and the adapter reports whichever command is in
+the foreground. For other launchers, add the launcher name to
+`@agent-status-command-pattern` or rely on a title pattern.
+
 For Claude's static title, install the [Claude adapter](../adapters/claude/README.md)
 and restart/resume Claude. In recent Claude versions, `/plugins` lists loaded
 plugins. The adapter should appear as `tmux-agent-status@skills-dir` when

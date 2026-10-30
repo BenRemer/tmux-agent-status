@@ -50,8 +50,9 @@ interactive tmux sessions. It does not change titles, permissions, or
 conversation content, and never starts a model request. A running turn
 includes time waiting for tool permission.
 
-The pane-local `@agent-status-busy-command` option is `claude` while a main
-turn is active, and empty when idle. The tmux plugin accepts it only while
+The pane-local `@agent-status-busy-command` option holds the pane's
+foreground command (normally `claude`, or a launcher's name such as
+`toolbox-exec`) while a main turn is active, and is empty when idle. The tmux plugin accepts it only while
 that command is in the foreground and recognized as an agent. If Claude is
 killed without cleanup, its marker is ignored once the shell returns; the
 next Claude session clears the old marker on startup.

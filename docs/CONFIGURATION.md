@@ -10,6 +10,14 @@ placement. The compact preset decorates the existing global
 `window-status-format`, `window-status-current-format`, and `status-right`.
 It does not replace the whole theme or change key bindings.
 
+Themes that draw tabs with inline colors, such as powerline layouts, would
+hide a wrapping accent. For these, the preset reads the literal `bg=`/`fg=`
+colors in effect before the window index or name and routes every use of
+those colors in the tab format, including separators, through the running or
+bell accent. It places the icon before the tab's closing style and separator.
+If the colors are not literal, or the closing style is inside a conditional,
+it falls back to wrapping the tab and appending the icon.
+
 | Input | Manual default | Compact default |
 |---|---|---|
 | `@agent-status-running-icon` | `⚙` | `⚙` |
