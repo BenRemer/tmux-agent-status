@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add an optional Antigravity title adapter to translate its working state
+  into the running cog without changing completion bells.
+- Document tmux activity popups and load order with tmux-power.
+- Run the existing CI checks on pushes to the public development branch.
+
 ## 0.1.0-beta.2
 
 - Recognize Antigravity's `agy` command by default, alongside Codex and Claude.

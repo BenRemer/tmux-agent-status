@@ -23,6 +23,52 @@ run it.
 The adapter reports main-turn activity. Waiting for a tool permission is still
 part of that active turn. It is not a CPU-usage indicator.
 
+For Antigravity, configure the [title adapter](../adapters/antigravity/README.md)
+on the machine running `agy`. A working bell does not imply that activity is
+being reported. For a tab with an unread bell, the bell takes priority over
+the running cog.
+
+## “Activity in window” covers the status bar
+
+This is tmux's visual **activity** alert, triggered by terminal output. It is
+separate from the plugin's running cog and terminal-bell indicators. A theme
+such as tmux-power can style the message and have its status sections covered
+by it without being the component that enabled the alert.
+
+On the affected tmux server, suppress that popup immediately:
+
+```sh
+tmux set-option -g visual-activity off
+tmux set-option visual-activity off
+```
+
+The second command also handles an override on the current session. For a
+persistent setting, put `set -g visual-activity off` after your theme and plugin
+initialization in `.tmux.conf`. Remove any conflicting session-specific setting.
+This leaves `monitor-bell`, `bell-action`, and the plugin's bell icons unchanged.
+Apply it to the layer displaying the message if you use nested tmux.
+
+If you also do not want ordinary terminal output to trigger activity alerts,
+set `activity-action none` on that server. Keep `monitor-bell on` for actual
+completion bells.
+
+## tmux-power overwrites the cog or corner
+
+Load tmux-power before tmux-agent-status. The theme replaces window and status
+formats when loaded, so loading it afterward removes the plugin's placement.
+With TPM, order the entries like this before TPM initializes:
+
+```tmux
+set -g @plugin 'wfxr/tmux-power'
+set -g @plugin 'benremer/tmux-agent-status#dev'
+set -g @agent-status-preset 'compact'
+```
+
+The `#dev` suffix selects the currently published development branch. When
+using manual mode, place the public tokens in your final formats after the
+theme loads. Adding `@agent-status-preset 'compact'` changes placement, but
+does not make an agent publish activity.
+
 ## The cog works but there is no bell
 
 Activity and notification delivery are separate. First test the native path:

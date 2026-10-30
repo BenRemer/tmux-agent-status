@@ -3,6 +3,16 @@
 Beta `0.1.0-beta.2`, verified locally on Linux on October 30, 2026.
 Pending checks are listed explicitly.
 
+## Development update after beta.2
+
+The `dev` branch adds an Antigravity title adapter. All 14 integration tests
+passed on the same four Linux tmux builds below, including translation of
+working, tool-use, idle, review, error, and unknown states, invalid input,
+other-session cogs, and independent completion bells. These are synthetic
+payload tests; the adapter still needs a live Antigravity check on the
+affected machine. The user confirmed that Antigravity's bells already work.
+The packaged beta.2 results below predate this adapter.
+
 ## Compatibility
 
 | Runtime | Evidence |

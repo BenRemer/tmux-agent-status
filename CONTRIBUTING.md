@@ -20,8 +20,9 @@ Review their output for private information before sharing it.
 
 ## Develop
 
-The runtime uses POSIX shell and native tmux formats. Python 3 is needed for
-the integration suite, and ShellCheck for shell linting:
+The core uses POSIX shell and native tmux formats. Python 3 is needed for
+the integration suite and the optional Antigravity title adapter, and
+ShellCheck for shell linting:
 
 ```sh
 shellcheck -x -s sh agent-status.tmux scripts/preset.sh

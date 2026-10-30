@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """End-to-end tests using disposable tmux servers and real, drained PTYs."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -9,6 +10,7 @@ import shlex
 import shutil
 import struct
 import subprocess
+import sys
 import tempfile
 import termios
 import threading
@@ -215,6 +217,34 @@ class Integration(unittest.TestCase):
         self.s.tm("set-option", "-p", "-t", a, "@agent-status-busy-command", "claude")
         self.s.tm("respawn-pane", "-k", "-t", a, "sleep 300")
         self.assertEqual("0", self.s.eval(a, "#{E:@agent-status-window-busy}"))
+
+    def test_antigravity_title_adapter(self):
+        a = self.s.agent(name="agy")
+        client = self.s.attach("B:0")
+        self.s.load("compact")
+        script = ROOT / "adapters" / "antigravity" / "title.py"
+        cases = [
+            (json.dumps({"agent_state": state, "conversation_title": "private"}), busy)
+            for state, busy in [
+                ("idle", False), ("working", True), ("tool_use", True),
+                ("reviewing", False), ("working", True), ("error", False),
+                ("initializing", False), ("authenticating", False),
+                ("future-state", False),
+            ]
+        ] + [("{}", False), ("null", False), ("[]", False), ("not JSON", False)]
+        for payload, busy in cases:
+            with self.subTest(payload=payload):
+                result = subprocess.run([sys.executable, str(script)], input=payload,
+                                        capture_output=True, text=True, check=True, timeout=5)
+                self.assertEqual("", result.stderr)
+                self.assertEqual("⠋ agy\n" if busy else "agy\n", result.stdout)
+                self.s.emit(a, f"\x1b]2;{result.stdout.strip()}\x07")
+                self.assertEqual("⚙" if busy else "", self.s.eval(a, PUBLIC))
+                self.assertEqual(busy, "⚙" in self.s.eval("B:0", OTHER, client))
+                self.assertEqual("0", self.s.eval(a, "#{window_bell_flag}"))
+        self.s.emit(a, "\a")
+        self.assertEqual("🔔", self.s.eval(a, PUBLIC))
+        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
 
     def test_cross_session_bells_survive_completion_and_reload(self):
         a1 = self.s.agent()

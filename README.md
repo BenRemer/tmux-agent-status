@@ -26,8 +26,8 @@ A bell takes priority over the running icon on a tab. Both can appear in the
 corner. Your selected tab keeps its normal highlight while working.
 
 No daemon, transcript scraping, model requests, or shell polling during status
-refreshes. The core uses native tmux formats; the optional Claude adapter
-reports turn events.
+refreshes. The core uses native tmux formats; optional adapters report Claude
+turn events or Antigravity's activity title.
 
 > **Beta:** tmux 3.4+ is required. Linux is locally verified. macOS CI is
 > configured but its first hosted run is still pending. See the precise
@@ -125,12 +125,11 @@ load this adapter.
 
 ### Antigravity (`agy`)
 
-`agy` is recognized by default. Antigravity needs a configured title command
-to publish activity in its terminal title; command recognition alone does not
-mark it as running. Use a title matching the configured busy-title pattern,
-or an integration following the
-[activity-reporting contract](docs/CONFIGURATION.md#reporting-activity-from-another-agent).
-See Antigravity's [title configuration](https://antigravity.google/docs/cli/title/).
+`agy` is recognized by default. Install the
+[optional title adapter](adapters/antigravity/README.md) to publish its working
+state. Without a title command, bells can work while the running cog stays
+absent. The adapter is currently available on the `dev` branch, after beta.2;
+it is not included in the beta.2 archive.
 
 Enable `"notifications": true` in `~/.gemini/antigravity-cli/settings.json`
 for terminal bells, as described in its
