@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.test-results/
+.venv/
+dist/
+*.egg-info/
+adapters/claude/.claude-plugin/types/
+adapters/claude/tsconfig.json

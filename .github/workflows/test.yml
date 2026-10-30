@@ -1,0 +1,74 @@
+name: Test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            tmux: '3.4'
+          - os: ubuntu-latest
+            tmux: '3.5a'
+          - os: ubuntu-latest
+            tmux: '3.6a'
+          - os: macos-latest
+            tmux: '3.6a'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libevent-dev libncurses-dev bison shellcheck
+      - name: macOS build dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install libevent ncurses pkg-config bison shellcheck
+          echo "PKG_CONFIG_PATH=$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+      - name: Build tmux
+        env:
+          TMUX_VERSION: ${{ matrix.tmux }}
+        run: |
+          curl -fL "https://github.com/tmux/tmux/releases/download/$TMUX_VERSION/tmux-$TMUX_VERSION.tar.gz" -o "$RUNNER_TEMP/tmux.tar.gz"
+          tar -xzf "$RUNNER_TEMP/tmux.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/tmux-$TMUX_VERSION"
+          ./configure
+          make -j2
+          echo "TMUX_BIN=$PWD/tmux" >> "$GITHUB_ENV"
+      - name: Shell lint
+        run: shellcheck -x -s sh agent-status.tmux scripts/preset.sh
+      - name: Integration tests
+        run: python3 tests/integration.py
+      - name: Release metadata and documentation
+        run: python3 tools/check_release.py
+  claude-adapter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the public Claude test runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/claude" --ignore-scripts --no-audit --no-fund @anthropic-ai/claude-code@2.1.314
+          node "$RUNNER_TEMP/claude/node_modules/@anthropic-ai/claude-code/install.cjs"
+          echo "$RUNNER_TEMP/claude/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Validate and test the optional adapter
+        env:
+          CLAUDE_CONFIG_DIR: ${{ runner.temp }}/claude-config
+        run: |
+          mkdir -p "$CLAUDE_CONFIG_DIR"
+          claude --version
+          claude plugin validate --strict adapters/claude
+          claude plugin test adapters/claude
