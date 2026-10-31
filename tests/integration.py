@@ -349,9 +349,10 @@ class Integration(unittest.TestCase):
         # Body, entry and exit separators follow the accent (plus the wrapper).
         self.assertNotIn("#363a4f", busy)
         self.assertEqual(4, busy.count("#30464b"))
-        self.assertIn("fg=#cad3f5,bg=#30464b,bold] 1:codex", busy)
+        # tmux may automatically rename the window, so match only its index.
+        self.assertIn("fg=#cad3f5,bg=#30464b,bold] 1:", busy)
         # The icon stays inside the tab, before the closing separator.
-        self.assertIn(f"1:codex ⚙ #[fg=#30464b,bg=#1e2030,none]{arrow}#[default]", busy)
+        self.assertRegex(busy, f" ⚙ #\\[fg=#30464b,bg=#1e2030,none\\]{arrow}#\\[default\\]")
         self.s.emit(a, "\a")
         bell = self.s.eval(a, "#{E:window-status-format}")
         self.assertEqual(4, bell.count("#eed49f"))
@@ -359,7 +360,7 @@ class Integration(unittest.TestCase):
         self.assertIn(f" {BELL} #[", bell)
         self.s.tm("select-window", "-t", "A:1")
         selected = self.s.eval(a, "#{E:window-status-current-format}")
-        self.assertIn("bg=#8bd5ca,bold] 1:codex", selected)
+        self.assertIn("bg=#8bd5ca,bold] 1:", selected)
         self.assertNotIn("#30464b", selected)
         applied = self.s.option("window-status-format")
         self.s.load()
@@ -374,10 +375,10 @@ class Integration(unittest.TestCase):
         self.s.load("compact")
         self.s.busy(a)
         value = self.s.eval(a, "#{E:window-status-format}")
-        self.assertIn(" 1 codex ⚙ #[default]", value)
+        self.assertRegex(value, r" 1 \S+ ⚙ #\[default\]")
         self.s.load("none")
         self.assertNotIn("@agent-status-internal-preset", self.s.option("window-status-format"))
-        self.assertEqual("[ 1 codex ]", self.s.eval(a, "[#{E:window-status-format}]"))
+        self.assertRegex(self.s.eval(a, "[#{E:window-status-format}]"), r"^\[ 1 \S+ \]$")
 
     def test_compact_icon_falls_back_to_the_end(self):
         # A closing style inside a conditional is not a safe insertion point.
