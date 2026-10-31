@@ -123,6 +123,12 @@ class Server:
 
     def emit(self, pane, data):
         tty = self.eval(pane, "#{pane_tty}")
+        if not tty:
+            state = self.tm("list-panes", "-a", "-F",
+                            "#{pane_id} #{session_name}:#{window_index} dead=#{pane_dead} "
+                            "status=#{pane_dead_status} cmd=#{pane_current_command} "
+                            "start=#{pane_start_command}")
+            raise AssertionError(f"pane {pane} has no tty:\n{state}")
         with open(tty, "wb", buffering=0) as stream:
             stream.write(data.encode() if isinstance(data, str) else data)
         time.sleep(.07)
