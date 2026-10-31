@@ -18,8 +18,8 @@ working in another session, and come back when a tab has something for you.
 | Indicator | Meaning |
 |---|---|
 | ⚙ | An agent is working. The compact preset adds a soft tab accent. |
-|  | A window has an unread terminal bell. Visit that window to acknowledge it. |
-| Corner ⚙ /  | Work or notifications exist in another session on this tmux server. |
+| <img src="docs/images/bell.png" alt="bell" height="16"> | A window has an unread terminal bell. Visit that window to acknowledge it. |
+| Corner ⚙ / <img src="docs/images/bell.png" alt="bell" height="16"> | Work or notifications exist in another session on this tmux server. |
 | No icon | No work or notification to show. |
 
 The bell is a [Nerd Font](https://www.nerdfonts.com/) glyph, sized like the
@@ -229,7 +229,7 @@ Set options before the plugin loads, then reload to apply them.
 | Option | Default |
 |---|---|
 | `@agent-status-preset` | `none`; opt into `compact` |
-| `@agent-status-icons` | `nerd-font` (`⚙`, ``); `emoji` uses `⚙`, `🔔` |
+| `@agent-status-icons` | `nerd-font` (⚙ and the Nerd Font bell <img src="docs/images/bell.png" alt="bell" height="16">); `emoji` uses ⚙ and 🔔 |
 | `@agent-status-running-icon` | From `@agent-status-icons` |
 | `@agent-status-bell-icon` | From `@agent-status-icons` |
 | `@agent-status-command-pattern` | `^(codex\|claude\|agy)$` |

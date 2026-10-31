@@ -368,6 +368,17 @@ class Integration(unittest.TestCase):
         self.assertEqual(theme, self.s.option("window-status-format"))
         self.assertEqual(current, self.s.option("window-status-current-format"))
 
+    def test_compact_icon_keeps_plain_tab_padding(self):
+        self.s.tm("set-option", "-g", "window-status-format", " #I #W ")
+        a = self.s.agent()
+        self.s.load("compact")
+        self.s.busy(a)
+        value = self.s.eval(a, "#{E:window-status-format}")
+        self.assertIn(" 1 codex ⚙ #[default]", value)
+        self.s.load("none")
+        self.assertNotIn("@agent-status-internal-preset", self.s.option("window-status-format"))
+        self.assertEqual("[ 1 codex ]", self.s.eval(a, "[#{E:window-status-format}]"))
+
     def test_compact_icon_falls_back_to_the_end(self):
         # A closing style inside a conditional is not a safe insertion point.
         theme = "#[bg=#363a4f] #W#{?window_bell_flag,#[bg=red] BELL,}"

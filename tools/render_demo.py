@@ -83,6 +83,15 @@ class Renderer:
                 draw.text((x, y + 2), cell.data, font=font, fill=fg)
         return image
 
+    def icon(self, glyph, output, fill="#d29922", size=64):
+        # GitHub cannot show Nerd Font glyphs, so the docs show the bell as an image.
+        font = ImageFont.truetype(self.icons.path, size)
+        left, top, right, bottom = font.getbbox(glyph)
+        image = Image.new("RGBA", (right - left + 8, bottom - top + 8), (0, 0, 0, 0))
+        ImageDraw.Draw(image).text((4 - left, 4 - top), glyph, font=font, fill=fill)
+        image.save(output, optimize=True)
+        print(output)
+
     def compose(self, frames, notes, output):
         width = max(frame.width for _, frame in frames) + 64
         height = 36 + sum(frame.height + 56 for _, frame in frames) + 76
@@ -147,6 +156,7 @@ def main():
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     renderer = Renderer(args.font, args.icon_font, args.emoji_font)
+    renderer.icon("\uf0f3", args.output / "bell.png")
     s = Server(columns=92, rows=9)
     try:
         set_theme(s)

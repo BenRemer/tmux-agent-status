@@ -12,8 +12,11 @@
   separator. Layouts it cannot read keep the previous behavior.
 - The Claude adapter reports the pane's actual foreground command, so activity
   works when Claude runs under a launcher such as `toolbox-exec`.
-- The integration tests run on macOS.
-- The default bell icon is now the Nerd Font bell ``, sized like the cog.
+- The integration tests run on macOS, and the macOS CI job builds tmux with
+  utf8proc as its configure script requires.
+- The compact preset places the icon before a plain tab's trailing padding,
+  so the tab no longer ends right at the icon.
+- The default bell icon is now the Nerd Font bell (U+F0F3, `nf-fa-bell`), sized like the cog.
   Set `@agent-status-icons 'emoji'` to keep 🔔 in terminals without a Nerd
   Font.
 

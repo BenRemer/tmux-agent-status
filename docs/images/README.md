@@ -1,6 +1,8 @@
 # Demo image provenance
 
-These images render **actual output from an isolated tmux server**. The demo
+These images render **actual output from an isolated tmux server**.
+`bell.png` is the default Nerd Font bell drawn by the same script, because
+GitHub's fonts cannot display Nerd Font glyphs in the documentation. The demo
 uses harmless executables named `codex` and `claude`, explicit activity titles
 and events, and real terminal bells. It does not invoke a model, read a user's
 configuration, or reproduce private terminal contents.

@@ -33,9 +33,11 @@ jobs:
       - name: macOS build dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install libevent ncurses pkg-config bison shellcheck
-          echo "PKG_CONFIG_PATH=$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig" >> "$GITHUB_ENV"
+          brew install libevent ncurses utf8proc pkg-config bison shellcheck
+          echo "PKG_CONFIG_PATH=$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          # tmux's configure refuses to guess on macOS without a utf8proc choice.
+          echo "TMUX_CONFIGURE_FLAGS=--enable-utf8proc" >> "$GITHUB_ENV"
       - name: Build tmux
         env:
           TMUX_VERSION: ${{ matrix.tmux }}
@@ -43,7 +45,8 @@ jobs:
           curl -fL "https://github.com/tmux/tmux/releases/download/$TMUX_VERSION/tmux-$TMUX_VERSION.tar.gz" -o "$RUNNER_TEMP/tmux.tar.gz"
           tar -xzf "$RUNNER_TEMP/tmux.tar.gz" -C "$RUNNER_TEMP"
           cd "$RUNNER_TEMP/tmux-$TMUX_VERSION"
-          ./configure
+          # shellcheck disable=SC2086 # Flags are intentionally split.
+          ./configure ${TMUX_CONFIGURE_FLAGS-}
           make -j2
           echo "TMUX_BIN=$PWD/tmux" >> "$GITHUB_ENV"
       - name: Shell lint

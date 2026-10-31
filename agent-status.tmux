@@ -97,7 +97,7 @@ done
 
 # A literal bg/fg color from a style, for tinting themes with inline colors.
 agent_style_color() {
-    agent_color=$(printf '%s\n' "$1" | tr ', ' '\n\n' | sed -n "s/^$2=//p" | tail -n 1)
+    agent_color=$(printf '%s\n' "$1" | tr ',' ' ' | tr ' ' '\n' | sed -n "s/^$2=//p" | tail -n 1)
     case "$agent_color" in
         *[!#A-Za-z0-9]*) ;;
         *) printf '%s' "$agent_color" ;;

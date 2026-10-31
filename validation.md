@@ -23,7 +23,7 @@ The packaged beta.2 results below predate this adapter.
 | tmux 3.6a, upstream release | All 13 integration tests passed |
 | tmux next-3.7, local development build | All 13 integration tests passed |
 | tmux 1.8 | Rejected before changing options |
-| macOS 26.7.2, Homebrew tmux 3.7b (unreleased changes) | All 18 integration tests (including the Antigravity adapter test) and all 7 Claude adapter event tests passed locally; running and bell markers checked on a live server with Claude under `toolbox-exec`. Hosted CI run pending |
+| macOS 26.7.2, Homebrew tmux 3.7b (unreleased changes) | All 19 integration tests (including the Antigravity adapter test) and all 7 Claude adapter event tests passed locally; running and bell markers checked on a live server with Claude under `toolbox-exec`. Hosted CI run pending |
 | Codex | Live desktop use with build 0.166.0.827; README settings checked against the public 0.166.0 configuration schema |
 | Claude Code 2.1.314, public distribution | Strict adapter validation and all 7 event tests passed with a fresh configuration directory |
 | Antigravity (`agy`) | Command recognition and busy/idle titles covered by synthetic integration tests; live CLI not tested |

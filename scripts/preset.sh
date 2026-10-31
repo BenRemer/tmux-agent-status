@@ -43,7 +43,7 @@ agent_tint() {
     agent_tinted=$1
     agent_bg=$(agent_tab_color "$1" bg)
     agent_fg=$(agent_tab_color "$1" fg)
-    for agent_end in , ] ' '; do
+    for agent_end in ',' ']' ' '; do
         if [ -n "$agent_bg" ]; then
             for agent_key in bg fg; do
                 agent_tinted=$(agent_replace_token "$agent_tinted" \
@@ -59,15 +59,16 @@ agent_tint() {
     printf '%s' "$agent_tinted"
 }
 
-# Put the icon inside the tab: before the closing style and separator that
-# follow the label, outside any #{...}. Otherwise append it.
+# Put the icon inside the tab, before its trailing padding and any closing
+# style and separator that follow the label, outside any #{...}. Otherwise
+# append it.
 agent_place_icon() {
     case "$1" in
         *'#['*)
             agent_head=${1%'#['*}
             agent_tail=${1#"$agent_head"}
             ;;
-        *) printf '%s' "$1$agent_icon"; return ;;
+        *) agent_head=$1; agent_tail= ;;
     esac
     agent_opens=$(printf '%s' "$agent_head" | tr -cd '{' | wc -c)
     agent_closes=$(printf '%s' "$agent_head" | tr -cd '}' | wc -c)
