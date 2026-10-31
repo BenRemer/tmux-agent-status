@@ -52,7 +52,15 @@ jobs:
       - name: Shell lint
         run: shellcheck -x -s sh agent-status.tmux scripts/preset.sh
       - name: Integration tests
-        run: python3 tests/integration.py
+        shell: bash
+        run: |
+          set -o pipefail
+          # Surface failures as annotations, which are readable without the log.
+          if ! python3 tests/integration.py 2>&1 | tee "$RUNNER_TEMP/integration.log"; then
+            grep -E '^(FAIL|ERROR):|Error' "$RUNNER_TEMP/integration.log" | head -n 30 |
+              while IFS= read -r line; do echo "::error title=integration::$line"; done
+            exit 1
+          fi
       - name: Release metadata and documentation
         run: python3 tools/check_release.py
   claude-adapter:
