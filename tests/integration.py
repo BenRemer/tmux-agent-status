@@ -117,9 +117,16 @@ class Server:
                        command)
         for _ in range(50):
             if self.eval(pane, "#{pane_current_command}") == name:
-                break
+                return pane
             time.sleep(.02)
-        return pane
+        try:
+            probe = subprocess.run([str(program)], input="", capture_output=True,
+                                   text=True, timeout=2)
+            probe = f"exit {probe.returncode}: {probe.stdout}{probe.stderr}"
+        except Exception as error:  # Report the cause instead of the symptom.
+            probe = repr(error)
+        cat = os.path.realpath(shutil.which("cat"))
+        raise AssertionError(f"{name} did not start in {pane}; cat is {cat}; run directly: {probe}")
 
     def emit(self, pane, data):
         tty = self.eval(pane, "#{pane_tty}")
