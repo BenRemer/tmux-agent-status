@@ -24,13 +24,40 @@ OTHER = "#{E:@agent-status-other}"
 BELL = "\uf0f3"  # Default Nerd Font bell
 
 
+_FIXTURE_TEMP = None
+_FIXTURE_SOURCE = None
+
+
 def copy_program(destination):
-    # Copy bits only: macOS refuses to copy cat's system file flags.
-    shutil.copy(shutil.which("cat"), destination)
-    if sys.platform == "darwin":
-        # macOS kills a moved system binary until it is signed again.
-        subprocess.run(["codesign", "-f", "-s", "-", str(destination)],
-                       check=True, capture_output=True)
+    global _FIXTURE_TEMP, _FIXTURE_SOURCE
+    # Copy a stdin-reading binary under the agent's name so tmux sees a real
+    # foreground process name. Ubuntu 26's uutils cat is a multicall binary that
+    # rejects unknown argv[0] names, so probe before caching a candidate.
+    candidates = (_FIXTURE_SOURCE,) if _FIXTURE_SOURCE else ("cat", "gnucat", "rev")
+    for candidate in candidates:
+        source = shutil.which(candidate) if candidate else None
+        if not source:
+            continue
+        # Copy bits only: macOS refuses to copy system file flags.
+        shutil.copy(source, destination)
+        if sys.platform == "darwin":
+            # macOS kills a moved system binary until it is signed again.
+            subprocess.run(["codesign", "-f", "-s", "-", str(destination)],
+                           check=True, capture_output=True)
+        if _FIXTURE_SOURCE:
+            return
+        if subprocess.run([str(destination)], input=b"",
+                          capture_output=True, timeout=2).returncode == 0:
+            _FIXTURE_SOURCE = os.path.realpath(source)
+            return
+    _FIXTURE_TEMP = tempfile.TemporaryDirectory(prefix="agent-fixture-src-")
+    _FIXTURE_SOURCE = str(Path(_FIXTURE_TEMP.name) / "agent-fixture")
+    subprocess.run(
+        ["cc", "-x", "c", "-", "-o", _FIXTURE_SOURCE],
+        input="#include <unistd.h>\n"
+              "int main(void){char b[256];while(read(0,b,sizeof b)>0){}return 0;}\n",
+        text=True, check=True, capture_output=True)
+    shutil.copy(_FIXTURE_SOURCE, destination)
 
 
 class Server:
@@ -125,8 +152,8 @@ class Server:
             probe = f"exit {probe.returncode}: {probe.stdout}{probe.stderr}"
         except Exception as error:  # Report the cause instead of the symptom.
             probe = repr(error)
-        cat = os.path.realpath(shutil.which("cat"))
-        raise AssertionError(f"{name} did not start in {pane}; cat is {cat}; run directly: {probe}")
+        raise AssertionError(
+            f"{name} did not start in {pane}; source is {_FIXTURE_SOURCE}; run directly: {probe}")
 
     def emit(self, pane, data):
         tty = self.eval(pane, "#{pane_tty}")
