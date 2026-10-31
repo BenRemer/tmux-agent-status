@@ -37,9 +37,10 @@ def color(value, default):
 
 
 class Renderer:
-    def __init__(self, mono, emoji):
+    def __init__(self, mono, icons, emoji=None):
         self.font = ImageFont.truetype(str(mono), 23)
-        self.emoji = ImageFont.truetype(str(emoji), 22)
+        self.icons = ImageFont.truetype(str(icons), 23)
+        self.emoji = ImageFont.truetype(str(emoji), 22) if emoji else self.font
         self.caption = ImageFont.truetype(str(mono), 19)
         self.cw = round(self.font.getlength("M"))
         self.ch = 31
@@ -73,7 +74,11 @@ class Renderer:
                 if not cell.data or cell.data == " ":
                     continue
                 fg = color(cell.bg, BG) if cell.reverse else color(cell.fg, FG)
-                font = self.emoji if "🔔" in cell.data else self.font
+                font = self.font
+                if any(0xE000 <= ord(c) <= 0xF8FF or ord(c) >= 0xF0000 for c in cell.data):
+                    font = self.icons  # Nerd Font glyphs live in the Private Use Area.
+                elif "🔔" in cell.data:
+                    font = self.emoji
                 x, y = ox + col * self.cw, oy + row * self.ch
                 draw.text((x, y + 2), cell.data, font=font, fill=fg)
         return image
@@ -134,11 +139,14 @@ def message(server, pane, heading, lines):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--font", required=True, type=Path)
-    parser.add_argument("--emoji-font", required=True, type=Path)
+    parser.add_argument("--icon-font", required=True, type=Path,
+                        help="a Nerd Font, for the default bell icon")
+    parser.add_argument("--emoji-font", type=Path,
+                        help="only needed when rendering emoji icons")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/images")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    renderer = Renderer(args.font, args.emoji_font)
+    renderer = Renderer(args.font, args.icon_font, args.emoji_font)
     s = Server(columns=92, rows=9)
     try:
         set_theme(s)

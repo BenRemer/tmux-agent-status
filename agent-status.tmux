@@ -61,8 +61,16 @@ case "$agent_mode" in
     *) agent_warn '@agent-status-preset must be none or compact'; exit 1 ;;
 esac
 
-agent_running_icon=$(agent_input @agent-status-running-icon '⚙')
-agent_bell_icon=$(agent_input @agent-status-bell-icon '🔔')
+# tmux cannot see the terminal's font. The Nerd Font bell matches the cog's
+# size; terminals without a Nerd Font can choose the wider emoji bell.
+agent_icons=$(agent_input @agent-status-icons nerd-font)
+case "$agent_icons" in
+    nerd-font) agent_running_glyph='⚙'; agent_bell_glyph='' ;;
+    emoji) agent_running_glyph='⚙'; agent_bell_glyph='🔔' ;;
+    *) agent_warn '@agent-status-icons must be nerd-font or emoji'; exit 1 ;;
+esac
+agent_running_icon=$(agent_input @agent-status-running-icon "$agent_running_glyph")
+agent_bell_icon=$(agent_input @agent-status-bell-icon "$agent_bell_glyph")
 agent_command_pattern=$(agent_input @agent-status-command-pattern '^(codex|claude|agy)$')
 agent_title_pattern=$(agent_input @agent-status-agent-title-pattern '^✳ ')
 agent_busy_pattern=$(agent_input @agent-status-busy-title-pattern '^(⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏) ')

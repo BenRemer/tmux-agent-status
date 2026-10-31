@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TMUX = os.environ.get("TMUX_BIN", shutil.which("tmux"))
 PUBLIC = "#{E:@agent-status-window}"
 OTHER = "#{E:@agent-status-other}"
+BELL = "\uf0f3"  # Default Nerd Font bell
 
 
 def copy_program(destination):
@@ -219,7 +220,7 @@ class Integration(unittest.TestCase):
         self.s.emit(a, "\a")
         self.s.tm("set-option", "-p", "-t", a, "@agent-status-busy-command", "")
         self.assertEqual("0", self.s.eval(a, "#{E:@agent-status-window-busy}"))
-        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER, client))
         self.assertNotIn("⚙", self.s.eval("B:0", OTHER, client))
         # A hard-killed Claude may leave its option behind. It must not mark
         # another command as working, even if the old title is still present.
@@ -252,8 +253,8 @@ class Integration(unittest.TestCase):
                 self.assertEqual(busy, "⚙" in self.s.eval("B:0", OTHER, client))
                 self.assertEqual("0", self.s.eval(a, "#{window_bell_flag}"))
         self.s.emit(a, "\a")
-        self.assertEqual("🔔", self.s.eval(a, PUBLIC))
-        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
+        self.assertEqual(BELL, self.s.eval(a, PUBLIC))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER, client))
 
     def test_claude_under_launcher_reports_its_own_command(self):
         # Launchers such as toolbox-exec stay in the foreground instead of claude.
@@ -276,23 +277,23 @@ class Integration(unittest.TestCase):
         self.s.busy(a1)
         self.assertIn("⚙", self.s.eval("B:0", OTHER, client))
         self.s.emit(a1, "\a")
-        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
-        self.assertEqual("🔔", self.s.eval(a1, PUBLIC))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER, client))
+        self.assertEqual(BELL, self.s.eval(a1, PUBLIC))
         self.s.emit(a1, "Worked for 20m 58s • 9:19 PM\r\n")
         self.s.busy(a1, False)
         time.sleep(.2)  # Past this test server's popup timeout.
         self.s.load()
-        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER, client))
         self.assertNotIn("⚙", self.s.eval("B:0", OTHER, client))
         self.s.emit(a2, "\a")
         self.s.tm("switch-client", "-c", client, "-t", "A:1")
         self.s.tm("switch-client", "-c", client, "-t", "B")
-        self.assertIn("🔔", self.s.eval("B:0", OTHER, client))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER, client))
         self.s.tm("switch-client", "-c", client, "-t", "A:2")
         self.s.tm("switch-client", "-c", client, "-t", "B")
-        self.assertNotIn("🔔", self.s.eval("B:0", OTHER, client))
+        self.assertNotIn(BELL, self.s.eval("B:0", OTHER, client))
         # Verify actual PTY output as well as evaluated formats.
-        self.assertIn("🔔".encode(), self.s.clients[0][3])
+        self.assertIn(BELL.encode(), self.s.clients[0][3])
 
     def test_two_clients_and_session_rename(self):
         a = self.s.agent()
@@ -306,8 +307,8 @@ class Integration(unittest.TestCase):
         self.s.tm("rename-session", "-t", "A", "Renamed A")
         self.assertIn("⚙", self.s.eval("B:0", OTHER, cb))
         self.s.emit(b, "\a")
-        self.assertIn("🔔", self.s.eval("Renamed A:0", OTHER, ca))
-        self.assertNotIn("🔔", self.s.eval("B:0", OTHER, cb))
+        self.assertIn(BELL, self.s.eval("Renamed A:0", OTHER, ca))
+        self.assertNotIn(BELL, self.s.eval("B:0", OTHER, cb))
         self.s.tm("move-window", "-s", "Renamed A:1", "-t", "B:2")
         self.assertNotIn("⚙", self.s.eval("B:0", OTHER, cb))
 
@@ -355,7 +356,7 @@ class Integration(unittest.TestCase):
         bell = self.s.eval(a, "#{E:window-status-format}")
         self.assertEqual(4, bell.count("#eed49f"))
         self.assertNotIn("#30464b", bell)
-        self.assertIn(" 🔔 #[", bell)
+        self.assertIn(f" {BELL} #[", bell)
         self.s.tm("select-window", "-t", "A:1")
         selected = self.s.eval(a, "#{E:window-status-current-format}")
         self.assertIn("bg=#8bd5ca,bold] 1:codex", selected)
@@ -422,6 +423,26 @@ class Integration(unittest.TestCase):
         before = self.s.tm("show-options", "-g")
         result = self.s.load(check=False)
         self.assertNotEqual(0, result.returncode)
+        self.assertEqual(before, self.s.tm("show-options", "-g"))
+
+    def test_icon_sets_and_overrides(self):
+        a = self.s.agent()
+        self.s.load()
+        self.s.busy(a)
+        self.assertEqual("⚙", self.s.eval(a, PUBLIC))
+        self.s.emit(a, "\a")
+        self.assertEqual(BELL, self.s.eval(a, PUBLIC))
+        self.s.tm("set-option", "-g", "@agent-status-icons", "emoji")
+        self.s.load()
+        self.assertEqual("🔔", self.s.eval(a, PUBLIC))
+        self.s.tm("set-option", "-g", "@agent-status-bell-icon", "!")
+        self.s.load()
+        self.assertEqual("!", self.s.eval(a, PUBLIC))
+        self.s.tm("set-option", "-g", "@agent-status-icons", "nerdfont")
+        before = self.s.tm("show-options", "-g")
+        result = self.s.load(check=False)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("@agent-status-icons", result.stderr)
         self.assertEqual(before, self.s.tm("show-options", "-g"))
 
     def test_preset_styles_and_idle_empty_output(self):

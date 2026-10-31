@@ -13,6 +13,9 @@
 - The Claude adapter reports the pane's actual foreground command, so activity
   works when Claude runs under a launcher such as `toolbox-exec`.
 - The integration tests run on macOS.
+- The default bell icon is now the Nerd Font bell ``, sized like the cog.
+  Set `@agent-status-icons 'emoji'` to keep 🔔 in terminals without a Nerd
+  Font.
 
 ## 0.1.0-beta.2
 

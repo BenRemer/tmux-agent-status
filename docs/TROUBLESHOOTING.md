@@ -75,6 +75,18 @@ using manual mode, place the public tokens in your final formats after the
 theme loads. Adding `@agent-status-preset 'compact'` changes placement, but
 does not make an agent publish activity.
 
+## The bell icon is a box or question mark
+
+The default bell is a Nerd Font glyph. If the terminal showing tmux does not
+use a Nerd Font, set this before the plugin loads, then reload:
+
+```tmux
+set -g @agent-status-icons 'emoji'
+```
+
+Over SSH, the font that matters is the one on the machine running the
+terminal, not the remote host.
+
 ## The cog works but there is no bell
 
 Activity and notification delivery are separate. First test the native path:

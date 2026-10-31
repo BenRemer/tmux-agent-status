@@ -18,9 +18,13 @@ working in another session, and come back when a tab has something for you.
 | Indicator | Meaning |
 |---|---|
 | ⚙ | An agent is working. The compact preset adds a soft tab accent. |
-| 🔔 | A window has an unread terminal bell. Visit that window to acknowledge it. |
-| Corner ⚙ / 🔔 | Work or notifications exist in another session on this tmux server. |
+|  | A window has an unread terminal bell. Visit that window to acknowledge it. |
+| Corner ⚙ /  | Work or notifications exist in another session on this tmux server. |
 | No icon | No work or notification to show. |
+
+The bell is a [Nerd Font](https://www.nerdfonts.com/) glyph, sized like the
+cog. If your terminal font is not a Nerd Font and the bell shows as a box, set
+`@agent-status-icons 'emoji'` to use 🔔 instead.
 
 A bell takes priority over the running icon on a tab. Both can appear in the
 corner. Your selected tab keeps its normal highlight while working.
@@ -225,8 +229,9 @@ Set options before the plugin loads, then reload to apply them.
 | Option | Default |
 |---|---|
 | `@agent-status-preset` | `none`; opt into `compact` |
-| `@agent-status-running-icon` | `⚙` |
-| `@agent-status-bell-icon` | `🔔` |
+| `@agent-status-icons` | `nerd-font` (`⚙`, ``); `emoji` uses `⚙`, `🔔` |
+| `@agent-status-running-icon` | From `@agent-status-icons` |
+| `@agent-status-bell-icon` | From `@agent-status-icons` |
 | `@agent-status-command-pattern` | `^(codex\|claude\|agy)$` |
 | `@agent-status-agent-title-pattern` | `^✳ ` |
 | `@agent-status-busy-title-pattern` | Braille spinner followed by a space |
@@ -241,6 +246,9 @@ set -g @agent-status-bell-icon '!'
 set -g @agent-status-running-style 'bg=#30464b,fg=#cad3f5'
 set -g @agent-status-bell-style 'bg=#eed49f,fg=#181926,bold'
 ```
+
+Without a Nerd Font, use `set -g @agent-status-icons 'emoji'`. tmux cannot
+detect the terminal's font, so the plugin cannot choose this automatically.
 
 See [configuration details](docs/CONFIGURATION.md) for numeric state formats,
 empty overrides, and integration rules.

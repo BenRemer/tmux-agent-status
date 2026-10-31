@@ -20,8 +20,15 @@ it falls back to wrapping the tab and appending the icon.
 
 | Input | Manual default | Compact default |
 |---|---|---|
+| `@agent-status-icons` | `nerd-font` | `nerd-font` |
 | `@agent-status-running-icon` | `⚙` | `⚙` |
-| `@agent-status-bell-icon` | `🔔` | `🔔` |
+| `@agent-status-bell-icon` | `` | `` |
+
+The default bell is the Nerd Font bell `` (U+F0F3), which is text-sized
+like the cog. `@agent-status-icons 'emoji'` uses 🔔 instead, for terminals
+without a Nerd Font; emoji usually render two cells wide. Explicit icon inputs
+override either set. tmux cannot query the terminal's font, so the plugin
+cannot detect which set will display.
 | `@agent-status-running-style` | Inherit | `bg=#30464b,fg=#cad3f5` |
 | `@agent-status-bell-style` | Inherit | `bg=#eed49f,fg=#181926,bold` |
 
