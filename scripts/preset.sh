@@ -59,6 +59,29 @@ agent_tint() {
     printf '%s' "$agent_tinted"
 }
 
+# Pad before the label when nothing separates it from the tab's edge, so the
+# accent does not start right at the first character. Only a label outside
+# any #{...} is padded.
+agent_lead_pad() {
+    agent_prefix=$1
+    for agent_name in '#I' '#W' '#{window_index}' '#{window_name}'; do
+        agent_before=${1%%"$agent_name"*}
+        if [ "${#agent_before}" -lt "${#agent_prefix}" ]; then
+            agent_prefix=$agent_before
+        fi
+    done
+    agent_popens=$(printf '%s' "$agent_prefix" | tr -cd '{' | wc -c)
+    agent_pcloses=$(printf '%s' "$agent_prefix" | tr -cd '}' | wc -c)
+    case "$agent_prefix" in
+        *' ') printf '%s' "$1"; return ;;
+    esac
+    if [ $((agent_popens)) -ne $((agent_pcloses)) ]; then
+        printf '%s' "$1"
+        return
+    fi
+    printf '%s' "$agent_prefix$agent_icon_pad${1#"$agent_prefix"}"
+}
+
 # Put the icon inside the tab, before its trailing padding and any closing
 # style and separator that follow the label, outside any #{...}. Otherwise
 # append it.
@@ -84,6 +107,7 @@ agent_place_icon() {
         printf '%s' "$1$agent_icon"
         return
     fi
+    agent_head=$(agent_lead_pad "$agent_head")
     # tmux's default formats end in a flags-or-space conditional: keep the
     # flags before the icon and pad after it, inside the tab.
     case "$agent_head" in

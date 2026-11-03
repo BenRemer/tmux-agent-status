@@ -483,13 +483,13 @@ class Integration(unittest.TestCase):
     def test_compact_icon_is_padded_in_tmux_default_format(self):
         # tmux's default ends in a flags-or-space conditional, not a literal space.
         busy, idle = self._padded_tab("#I:#W#{?window_flags,#{window_flags}, }")
-        self.assertRegex(busy, r"^\[1:\S+? ⚙ \]$")
+        self.assertRegex(busy, r"^\[ 1:\S+? ⚙ \]$")
         self.assertRegex(idle, r"^\[1:\S+?( |[^ ])\]$")
         self.assertNotIn("  ", busy + idle)
 
     def test_compact_icon_is_padded_in_tabs_without_padding(self):
         busy, idle = self._padded_tab("#[bg=blue]#I #W")
-        self.assertRegex(busy, r"^\[1 \S+ ⚙ \]$")
+        self.assertRegex(busy, r"^\[ 1 \S+ ⚙ \]$")
         self.assertRegex(idle, r"^\[1 \S+\]$")
 
     def test_compact_icon_falls_back_to_the_end(self):

@@ -7,9 +7,10 @@
   only the title adapter, not its notification setting. It runs only tmux
   commands per title change, plus one shell command per finished turn.
   Disable it with `@agent-status-completion-bell off`.
-- The compact preset pads the icon inside the accent when a tab has no
-  trailing space of its own, including tmux's default window format, so the
-  colored tab no longer ends right at the icon. Formats that begin with a
+- The compact preset pads both ends of the accent when a tab has no
+  space of its own before the label or after the icon, including tmux's
+  default window format. The colored tab no longer starts at the first
+  character or ends at the icon. Formats that begin with a
   style now get the icon inside the tab instead of at the end.
 - The Claude adapter now rings the tmux bell on turn completion even when
   Claude's notification channel is the default `auto`, which sends nothing
