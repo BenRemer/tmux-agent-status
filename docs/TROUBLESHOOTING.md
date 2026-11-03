@@ -98,10 +98,15 @@ sleep 3; printf '\a'
 Switch to another window before it rings. If its tab gets a bell, the tmux
 path works and the agent needs notification setup.
 
-- Codex: enable notifications, choose `notification_method = "bel"`, and set
-  `notification_condition = "always"`.
-- Claude: use the adapter and set `"preferredNotifChannel": "terminal_bell"`
-  in its settings. An automatic OS-notification channel may not emit BEL.
+- Codex and agy: the plugin's completion bell rings when the busy title
+  turns idle. Check that `@agent-status-completion-bell` is not `off`, and
+  that the cog appears while the agent works. No cog means no busy title,
+  and then there is nothing to detect. For agy, install the title adapter.
+- Claude: install the [adapter](../adapters/claude/README.md); without it,
+  Claude's default `auto` channel sends nothing inside tmux. Check that
+  `preferredNotifChannel` is not `notifications_disabled`. Set it to
+  `terminal_bell` so permission prompts and other Claude notifications ring
+  too, not just turn completion.
 - Check `monitor-bell on` and `bell-action any` in the relevant tmux server.
 
 Changes to agent configuration may require restarting/resuming that agent.

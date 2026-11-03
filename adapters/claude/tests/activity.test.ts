@@ -107,3 +107,55 @@ test('a refused notification does not prevent turn completion', async ($, on) =>
   await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs: 1 })
   expect(completions).toBe(1)
 })
+
+function bellSetup(on, notifyResult) {
+  const commands = []
+  mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
+  on('process.run', ($, e) => {
+    commands.push(e.argv)
+    const stdout = e.argv.includes('display-message') ? '/dev/ttys004\n' : ''
+    return { value: { exitCode: 0, stdout, stderr: '' } }
+  })
+  on('ui.notify', () => ({ value: notifyResult }))
+  on('session.start', () => ({ cwd: '/tmp' }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
+  return commands
+}
+
+async function completeOneTurn($) {
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'main' })
+  await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs: 1 })
+  // The notification runs after completion returns; let it finish.
+  for (let i = 0; i < 20; i += 1) await Promise.resolve()
+}
+
+const bellWrite = ['sh', '-c', 'printf "\\a" > "$1"', 'sh', '/dev/ttys004']
+
+test('without a bell channel, completion rings the pane bell itself', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'no-channel' })
+  await completeOneTurn($)
+  expect(commands.slice(3)).toEqual([
+    ['tmux', '-S', '/tmp/socket', 'display-message', '-p', '-t', '%42', '#{pane_tty}'],
+    bellWrite,
+  ])
+})
+
+test('a desktop-notification channel still gets a tmux bell', async ($, on) => {
+  const commands = bellSetup(on, { isSent: true, channel: 'kitty' })
+  await completeOneTurn($)
+  expect(commands[commands.length - 1]).toEqual(bellWrite)
+})
+
+test('a terminal_bell channel is not rung twice', async ($, on) => {
+  const commands = bellSetup(on, { isSent: true, channel: 'terminal_bell' })
+  await completeOneTurn($)
+  expect(commands.length).toBe(3)
+})
+
+test('notifications_disabled is respected', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'disabled' })
+  await completeOneTurn($)
+  expect(commands.length).toBe(3)
+})

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- New completion bell: when a recognized agent's busy title turns idle, the
+  plugin rings that tab's bell. Codex now needs no setup. Antigravity needs
+  only the title adapter, not its notification setting. It runs only tmux
+  commands per title change, plus one shell command per finished turn.
+  Disable it with `@agent-status-completion-bell off`.
+- The compact preset pads the icon inside the accent when a tab has no
+  trailing space of its own, including tmux's default window format, so the
+  colored tab no longer ends right at the icon. Formats that begin with a
+  style now get the icon inside the tab instead of at the end.
+- The Claude adapter now rings the tmux bell on turn completion even when
+  Claude's notification channel is the default `auto`, which sends nothing
+  inside tmux. It also rings for OSC desktop-notification channels. It still
+  respects `notifications_disabled` and does not ring twice with
+  `terminal_bell`. The README explains what each `preferredNotifChannel` value
+  does and why `terminal_bell` is still recommended.
 - Add an optional Antigravity title adapter to translate its working state
   into the running cog without changing completion bells.
 - Document tmux activity popups and load order with tmux-power.

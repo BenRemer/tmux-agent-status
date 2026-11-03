@@ -4,8 +4,10 @@ Recent Claude Code versions keep their terminal title static inside tmux, so
 title matching cannot detect active work. This optional Claude mod reports
 main-turn start, completion (including cancellation), and session exit to a
 pane-local tmux option. Subagent events do not clear the main turn's marker.
-Normal main-turn completion also requests a notification through Claude's
-configured notification channel. Cancellation and subagent completion do not.
+Normal main-turn completion rings the tmux bell. The adapter uses Claude's
+notification channel, or rings the bell itself when that channel cannot reach
+tmux. See [Bells](#bells-and-preferrednotifchannel). Cancellation and subagent
+completion do not ring.
 
 Requires Claude Code with mods support. Validated with public Claude Code
 2.1.314, with activity and completion also confirmed in live desktop use.
@@ -30,7 +32,23 @@ Do not overwrite an existing directory with that name. Restart/resume Claude
 after installing. Claude may show its normal local-plugin trust prompt.
 Remove the symlink and restart Claude to uninstall this adapter.
 
-For tmux bell markers, merge this setting into `~/.claude/settings.json`:
+## Bells and `preferredNotifChannel`
+
+tmux shows a bell marker only when the pane writes a BEL character. On main
+turn completion, the adapter first asks Claude to notify through its
+configured channel. Then it acts on the result:
+
+| `preferredNotifChannel` | What happens on completion |
+|---|---|
+| `terminal_bell`, `iterm2_with_bell` | Claude writes BEL. The adapter does nothing more. |
+| `auto` (default) | Inside tmux, `auto` finds no channel, so Claude sends nothing. The adapter writes BEL to the pane's tty, which it reads from `tmux display -p '#{pane_tty}'`. |
+| `iterm2`, `kitty`, `ghostty` | Claude sends its OSC desktop notification. That sets no tmux bell flag, so the adapter also writes BEL. |
+| `notifications_disabled` | Nothing. The adapter respects it. |
+
+The fallback covers turn completion only. Claude's own notifications, such as
+permission prompts and idle input, reach tmux only through a BEL-writing
+channel. To get those too, set this in `~/.claude/settings.json`, or pick
+**Terminal Bell** for the notifications row in `/config`:
 
 ```json
 {
@@ -38,13 +56,12 @@ For tmux bell markers, merge this setting into `~/.claude/settings.json`:
 }
 ```
 
-Claude's `auto` channel may select a desktop-notification protocol or find no
-available channel; neither produces the BEL event needed by tmux. The adapter
-respects this preference, including `notifications_disabled`. A completion
-bell creates an unread marker only if the notified window is not currently
-being viewed. The marker also appears in other sessions' corner indicators.
+A completion bell creates an unread marker only if the notified window is not
+currently being viewed. The marker also appears in other sessions' corner
+indicators.
 
-The adapter runs one `tmux` command per activity change, using `TMUX` and
+The adapter runs one `tmux` command per activity change, plus two (read the
+pane's tty, write BEL) when it rings a fallback bell. It uses `TMUX` and
 `TMUX_PANE` to select the correct server and pane. It does nothing outside
 interactive tmux sessions. It does not change titles, permissions, or
 conversation content, and never starts a model request. A running turn

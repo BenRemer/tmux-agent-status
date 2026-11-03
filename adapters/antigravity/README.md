@@ -1,8 +1,10 @@
 # Antigravity activity title
 
-Antigravity emits terminal bells when notifications are enabled, but does not
-update the terminal title until a title command is configured. Recognizing
-the `agy` command alone therefore does not produce a running cog.
+Antigravity does not update the terminal title until a title command is
+configured. Recognizing the `agy` command alone therefore produces neither a
+running cog nor a completion bell. This adapter provides both: the plugin's
+[completion bell](../../README.md#completion-bell) rings when the busy title
+turns idle, so agy's own `"notifications"` setting is not needed for tmux.
 
 This optional adapter reads Antigravity's JSON title payload and prints a
 busy title for `working` and `tool_use`. All other states, including `idle`,
@@ -33,8 +35,10 @@ is installed elsewhere, and ensure `python3` is available to agy.
 
 Restart/resume agy. With the plugin's default recognition patterns, the title
 `⠋ agy` produces a cog while work is active, and `agy` clears it when idle.
-Existing terminal-bell notifications continue to work independently.
-An unread bell takes precedence over the cog on a tab.
+When the title returns to `agy`, the plugin rings the tab's bell. If you also
+enable agy's own notifications, you may get two bells per turn. Turn one off,
+for example with `set -g @agent-status-completion-bell off`. An unread bell
+takes precedence over the cog on a tab.
 
 To remove the adapter, restore your previous title configuration or remove
 the `title` block, then restart agy.

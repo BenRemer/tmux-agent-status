@@ -69,6 +69,11 @@ case "$agent_icons" in
     emoji) agent_running_glyph='⚙'; agent_bell_glyph='🔔' ;;
     *) agent_warn '@agent-status-icons must be nerd-font or emoji'; exit 1 ;;
 esac
+agent_completion_bell=$(agent_input @agent-status-completion-bell on)
+case "$agent_completion_bell" in
+    on|off) ;;
+    *) agent_warn '@agent-status-completion-bell must be on or off'; exit 1 ;;
+esac
 agent_running_icon=$(agent_input @agent-status-running-icon "$agent_running_glyph")
 agent_bell_icon=$(agent_input @agent-status-bell-icon "$agent_bell_glyph")
 agent_command_pattern=$(agent_input @agent-status-command-pattern '^(codex|claude|agy)$')
@@ -117,6 +122,17 @@ agent_tmux set-option -g @agent-status-internal-running-fg "$(agent_style_color 
 agent_tmux set-option -g @agent-status-internal-bell-bg "$(agent_style_color "$agent_bell_style" bg)"
 agent_tmux set-option -g @agent-status-internal-bell-fg "$(agent_style_color "$agent_bell_style" fg)"
 agent_tmux source-file "$agent_dir/agent-status.conf"
+
+# Ring the pane's bell when a busy agent title turns idle, so title-reporting
+# agents (Codex, agy) need no notification setup. tmux commands only; the
+# shell runs once per completed turn, never per title frame. A marker left by
+# an agent that exited is cleared without ringing.
+agent_hook='pane-title-changed[4721]'
+if [ "$agent_completion_bell" = on ]; then
+    agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{E:@agent-status-internal-pane-busy-title}' 'set-option -p @agent-status-internal-title-busy 1' { if-shell -F '#{@agent-status-internal-title-busy}' { set-option -pu @agent-status-internal-title-busy ; if-shell -F '#{E:@agent-status-internal-pane}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } } }"
+else
+    agent_tmux set-hook -gu "$agent_hook"
+fi
 
 # Shared functions and socket selection stay in this process.
 # shellcheck source=scripts/preset.sh

@@ -82,6 +82,8 @@ class Server:
         self.tm("set-option", "-g", "visual-bell", "on")
         self.tm("set-option", "-g", "status-interval", "1")
         self.tm("set-option", "-g", "display-time", "100")
+        # Most tests toggle titles freely; the completion bell has its own test.
+        self.tm("set-option", "-g", "@agent-status-completion-bell", "off")
         # A session name must not be shell-evaluated by any plugin code.
         self.tm("new-session", "-d", "-s", "B", "sleep 300")
 
@@ -209,6 +211,51 @@ class Integration(unittest.TestCase):
         self.assertEqual(windows, self.s.tm("show-options", "-gw"))
         self.assertEqual(keys, self.s.tm("list-keys"))
         self.assertEqual("", self.s.eval("A:0", PUBLIC))
+
+    def wait_for(self, target, fmt, expected):
+        for _ in range(50):
+            if self.s.eval(target, fmt) == expected:
+                break
+            time.sleep(.02)
+        return self.s.eval(target, fmt)
+
+    def test_completion_bell_from_busy_title(self):
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.load()
+        a = self.s.agent()
+        bell = "#{window_bell_flag}"
+        # Every spinner frame is a title change; none of them rings.
+        self.s.busy(a)
+        self.s.emit(a, "\x1b]2;⠙ Working\x07")
+        time.sleep(.2)
+        self.assertEqual("0", self.s.eval(a, bell))
+        self.assertEqual("1", self.s.eval(a, "#{@agent-status-internal-title-busy}"))
+        self.s.busy(a, False)
+        self.assertEqual("1", self.wait_for(a, bell, "1"))
+        self.assertEqual("", self.s.eval(a, "#{@agent-status-internal-title-busy}"))
+        # A second idle title does not ring again.
+        self.s.tm("select-window", "-t", a)
+        self.s.tm("select-window", "-t", "A:0")
+        self.s.busy(a, False)
+        time.sleep(.2)
+        self.assertEqual("0", self.s.eval(a, bell))
+
+    def test_completion_bell_skips_titles_from_non_agents(self):
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.load()
+        self.s.tm("new-window", "-d", "-t", "A:1", "sleep 300")
+        self.s.busy("A:1")
+        self.s.busy("A:1", False)
+        time.sleep(.2)
+        self.assertEqual("0", self.s.eval("A:1", "#{window_bell_flag}"))
+
+    def test_completion_bell_off_removes_the_hook(self):
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.load()
+        self.assertIn("pane-title-changed", self.s.tm("show-hooks", "-g", "pane-title-changed"))
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "off")
+        self.s.load()
+        self.assertNotIn("[4721]", self.s.tm("show-hooks", "-g", "pane-title-changed"))
 
     def test_recognition_busy_idle_hidden_and_dead(self):
         a = self.s.agent()
@@ -419,6 +466,31 @@ class Integration(unittest.TestCase):
         self.s.load("none")
         self.assertNotIn("@agent-status-internal-preset", self.s.option("window-status-format"))
         self.assertRegex(self.s.eval(a, "[#{E:window-status-format}]"), r"^\[ 1 \S+ \]$")
+
+    def _padded_tab(self, theme):
+        # The accent must extend past the icon, so the tab cannot end at it.
+        self.s.tm("set-option", "-g", "window-status-format", theme)
+        a = self.s.agent()
+        self.s.load("compact")
+        self.s.busy(a)
+        busy = re.sub(r"#\[[^]]*\]", "", self.s.eval(a, "[#{E:window-status-format}]"))
+        self.s.busy(a, on=False)
+        idle = re.sub(r"#\[[^]]*\]", "", self.s.eval(a, "[#{E:window-status-format}]"))
+        self.s.load("none")
+        self.assertEqual(theme, self.s.option("window-status-format"))
+        return busy, idle
+
+    def test_compact_icon_is_padded_in_tmux_default_format(self):
+        # tmux's default ends in a flags-or-space conditional, not a literal space.
+        busy, idle = self._padded_tab("#I:#W#{?window_flags,#{window_flags}, }")
+        self.assertRegex(busy, r"^\[1:\S+? ⚙ \]$")
+        self.assertRegex(idle, r"^\[1:\S+?( |[^ ])\]$")
+        self.assertNotIn("  ", busy + idle)
+
+    def test_compact_icon_is_padded_in_tabs_without_padding(self):
+        busy, idle = self._padded_tab("#[bg=blue]#I #W")
+        self.assertRegex(busy, r"^\[1 \S+ ⚙ \]$")
+        self.assertRegex(idle, r"^\[1 \S+\]$")
 
     def test_compact_icon_falls_back_to_the_end(self):
         # A closing style inside a conditional is not a safe insertion point.

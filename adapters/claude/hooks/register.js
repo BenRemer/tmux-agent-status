@@ -27,6 +27,42 @@ async function reportActivity($, busy) {
   }
 }
 
+// Claude's channels that write BEL, which tmux turns into a window bell.
+const BELL_CHANNELS = new Set(['terminal_bell', 'iterm2_with_bell']);
+
+async function notifyCompletion($, target) {
+  let result;
+  try {
+    result = await $.ui.notify('Task complete');
+  } catch {
+    // A hook or the channel refused the notification; respect that.
+    return;
+  }
+  // Respect an explicit `notifications_disabled`, and do nothing without a
+  // terminal. Otherwise make sure tmux sees a bell: Claude's default `auto`
+  // channel finds no method inside tmux, and OSC desktop notifications
+  // (iterm2, kitty, ghostty) do not set tmux's bell flag.
+  if (!result || BELL_CHANNELS.has(result.channel)) return;
+  if (!result.isSent && result.reason !== 'no-channel') return;
+  await ringPaneBell($, target);
+}
+
+async function ringPaneBell($, target) {
+  try {
+    const tty = await $.process.run([
+      'tmux', '-S', target.socket,
+      'display-message', '-p', '-t', target.pane, '#{pane_tty}',
+    ]);
+    const path = tty.exitCode === 0 ? tty.stdout.trim() : '';
+    if (!/^\/dev\/[A-Za-z0-9/._-]+$/.test(path)) return;
+    // Writing BEL to the pane's terminal is what an application ringing the
+    // bell does; tmux sets the window's bell flag from it.
+    await $.process.run(['sh', '-c', 'printf "\\a" > "$1"', 'sh', path]);
+  } catch {
+    // A missing tmux server must never stop a Claude turn or its completion.
+  }
+}
+
 export function register(on) {
   on('session.start', async ($, e, next) => {
     activeTurns.clear();
@@ -49,9 +85,9 @@ export function register(on) {
       const wasActive = activeTurns.delete(e.turnId);
       await reportActivity($, activeTurns.size > 0);
       if (connection && wasActive && activeTurns.size === 0 && !e.isAborted) {
-        // Use Claude's notification channel; never delay completion for a
-        // notification hook, and never notify for cancellation or child turns.
-        $.ui.notify('Task complete').catch(() => {});
+        // Never delay completion for a notification, and never notify for
+        // cancellation or child turns.
+        notifyCompletion($, connection).catch(() => {});
       }
     }
     return next(e);

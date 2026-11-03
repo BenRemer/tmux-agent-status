@@ -77,30 +77,35 @@ Existing sessions can stay running.
 
 ## Set up your agent
 
+| Agent | Running cog | Completion bell |
+|---|---|---|
+| Codex | No setup | No setup |
+| Claude Code | Install the adapter | Install the adapter; `terminal_bell` recommended |
+| Antigravity (`agy`) | Install the title adapter | Included with the title adapter |
+| Other agents | A busy title or an adapter | Included with a busy title |
+
+For agents that show a spinner in their terminal title, the plugin rings the
+tab's bell itself when the spinner goes away. That is the
+[completion bell](#completion-bell), and it needs no agent configuration.
+
 ### Codex
 
-Merge these settings into the existing `[tui]` section of your Codex config
-(normally `~/.codex/config.toml`):
+Nothing to set up. Codex's default terminal title includes `activity`, and the
+plugin uses its busy spinner for both the running cog and the completion bell.
+If you customize Codex's title items, keep `activity`.
 
-```toml
-[tui]
-notifications = true
-notification_method = "bel"
-notification_condition = "always"
-```
-
-Keep activity in Codex's terminal title. Its default title includes `activity`;
-if you customize title items, retain it. The plugin recognizes Codex's busy
-spinner and becomes idle when the spinner disappears. Restart/resume Codex
-after changing its config.
-
-The settings above are present in the public Codex 0.166.0
-[configuration schema](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/core/config.schema.json).
+You no longer need Codex's own `notification_method = "bel"`. If you already
+set it, Codex and the plugin may both ring at the end of a turn. Turn off one
+of them: remove the Codex setting, or set `@agent-status-completion-bell off`.
 
 ### Claude Code
 
-Recent Claude versions keep a static title inside tmux. Use the included
-adapter to report actual turn activity:
+Claude needs the included adapter for **both** indicators. Recent Claude
+versions keep a static title inside tmux, so the cog has nothing to match
+without it. And Claude's default notification channel (`auto`) sends nothing
+inside tmux, so without it a finished turn rings no bell either.
+
+**1. Install the adapter.** Link it into Claude's skills directory:
 
 ```sh
 mkdir -p ~/.claude/skills
@@ -109,7 +114,15 @@ ln -s ~/.tmux/plugins/tmux-agent-status/adapters/claude \
 ```
 
 If that destination already exists, inspect it instead of overwriting it.
-Merge this into `~/.claude/settings.json`:
+Restart/resume Claude. It may show its normal plugin trust prompt.
+
+The adapter shows the cog while the main turn runs. It rings the bell when the
+main turn finishes. Cancellation and subagent completion do not ring. It does
+nothing outside an interactive tmux session.
+
+**2. Recommended: set Claude's notification channel to the terminal bell.**
+Merge this into `~/.claude/settings.json`, or pick **Terminal Bell** for the
+notifications row in `/config`:
 
 ```json
 {
@@ -117,10 +130,18 @@ Merge this into `~/.claude/settings.json`:
 }
 ```
 
-Restart/resume Claude. The adapter sends a notification when the main turn
-finishes; cancellation and subagent completion do not ring. It does nothing
-outside an interactive tmux session. Claude may show its normal plugin trust
-prompt.
+This setting decides how the bell reaches tmux:
+
+| `preferredNotifChannel` | Completion bell in tmux |
+|---|---|
+| `terminal_bell` or `iterm2_with_bell` | Claude rings it. This also covers Claude's own notifications, such as permission prompts and idle input. |
+| `auto` (default) | No channel works inside tmux, so the adapter rings the pane's bell itself. You get completion bells only. |
+| `iterm2`, `kitty`, `ghostty` | Claude sends its desktop notification. These do not set tmux's bell flag, so the adapter also rings the pane's bell. |
+| `notifications_disabled` | No bell. The adapter respects this. |
+
+Without `terminal_bell`, Claude's own notifications never reach tmux. For
+example, a tab waiting on a permission prompt gets no bell. The adapter only
+covers turn completion, so set `terminal_bell` to get both.
 
 The adapter is tested with **public Claude Code 2.1.314**. See
 [adapter details](adapters/claude/README.md) for one-session loading, behavior,
@@ -129,16 +150,13 @@ load this adapter.
 
 ### Antigravity (`agy`)
 
-`agy` is recognized by default. Install the
-[optional title adapter](adapters/antigravity/README.md) to publish its working
-state. Without a title command, bells can work while the running cog stays
-absent. The adapter is currently available on the `dev` branch, after beta.2;
-it is not included in the beta.2 archive.
-
-Enable `"notifications": true` in `~/.gemini/antigravity-cli/settings.json`
-for terminal bells, as described in its
-[configuration reference](https://antigravity.google/docs/cli/reference/).
-Live Antigravity activity detection has not yet been verified.
+`agy` is recognized by default, but its title is static until you configure a
+title command. Install the
+[title adapter](adapters/antigravity/README.md). It shows a spinner while agy
+works, which gives you both the running cog and the completion bell. You don't
+need agy's `"notifications": true` for tmux. The adapter is currently
+available on the `dev` branch, after beta.2. It is not included in the beta.2
+archive. Live Antigravity activity detection has not yet been verified.
 
 ### Other agents
 
@@ -151,7 +169,21 @@ set -g @agent-status-command-pattern '^(codex|claude|agy|my-agent)$'
 A matching name alone does not mean an agent is working. It also needs a
 matching busy title or an integration that reports activity. See the
 [adapter contract](docs/CONFIGURATION.md#reporting-activity-from-another-agent).
-Terminal-bell notifications work independently of agent recognition.
+A matching busy title also gives the agent the completion bell. Bells the
+agent rings itself work independently of agent recognition.
+
+### Completion bell
+
+When a recognized agent's title changes from busy (a spinner) to idle, the
+plugin rings that pane's bell. It is a normal tmux bell, so it marks the tab
+and the corner indicator like any other. It does not ring while you are
+viewing the window. A new spinner frame never rings, and a shell's title
+change after the agent exits doesn't either. tmux runs a shell command only
+once per finished turn, not for every title change.
+
+Turn it off with `set -g @agent-status-completion-bell off`, for example if
+your agent already rings its own bell at completion. Claude's adapter rings
+its own bell, so this setting does not affect Claude.
 
 ## Choose your layout
 
@@ -237,6 +269,7 @@ Set options before the plugin loads, then reload to apply them.
 | `@agent-status-busy-title-pattern` | Braille spinner followed by a space |
 | `@agent-status-running-style` | Inherit in manual mode; soft teal in compact mode |
 | `@agent-status-bell-style` | Inherit in manual mode; amber in compact mode |
+| `@agent-status-completion-bell` | `on`; rings a tab's bell when its agent's busy title turns idle |
 
 For example:
 

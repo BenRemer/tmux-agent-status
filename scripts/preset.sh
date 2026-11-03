@@ -70,6 +70,10 @@ agent_place_icon() {
             ;;
         *) agent_head=$1; agent_tail= ;;
     esac
+    # A last style that comes before the label opens the tab; it does not close it.
+    case "$agent_tail" in
+        *'#I'*|*'#W'*|*'#{window_index}'*|*'#{window_name}'*) agent_head=$1; agent_tail= ;;
+    esac
     agent_opens=$(printf '%s' "$agent_head" | tr -cd '{' | wc -c)
     agent_closes=$(printf '%s' "$agent_head" | tr -cd '}' | wc -c)
     case "$agent_head" in
@@ -80,6 +84,14 @@ agent_place_icon() {
         printf '%s' "$1$agent_icon"
         return
     fi
+    # tmux's default formats end in a flags-or-space conditional: keep the
+    # flags before the icon and pad after it, inside the tab.
+    case "$agent_head" in
+        *"$agent_default_flags")
+            printf '%s' "${agent_head%"$agent_default_flags"}$agent_flags$agent_icon$agent_flags_pad$agent_tail"
+            return
+            ;;
+    esac
     agent_pad=
     while :; do
         case "$agent_head" in
@@ -87,6 +99,8 @@ agent_place_icon() {
             *) break ;;
         esac
     done
+    # Without padding of its own, the tab would end right at the icon.
+    [ -n "$agent_pad" ] || agent_pad=$agent_icon_pad
     printf '%s' "$agent_head$agent_icon$agent_pad$agent_tail"
 }
 
@@ -96,6 +110,10 @@ agent_apply_preset() {
     agent_close='#{E:@agent-status-internal-preset-window-close}'
     agent_icon='#{E:@agent-status-internal-preset-window-icon}'
     agent_other='#{E:@agent-status-internal-preset-other}'
+    agent_icon_pad='#{E:@agent-status-internal-preset-window-pad}'
+    agent_flags='#{E:@agent-status-internal-preset-window-flags}'
+    agent_flags_pad='#{E:@agent-status-internal-preset-window-flags-pad}'
+    agent_default_flags='#{?window_flags,#{window_flags}, }'
     agent_tint_bg='#{?#{E:@agent-status-internal-preset-bell-bg},#{@agent-status-internal-bell-bg},#{?#{E:@agent-status-internal-preset-running-bg},#{@agent-status-internal-running-bg},'
     agent_tint_fg='#{?#{E:@agent-status-internal-preset-bell-fg},#{@agent-status-internal-bell-fg},#{?#{E:@agent-status-internal-preset-running-fg},#{@agent-status-internal-running-fg},'
     agent_tint_end='}}#{@agent-status-internal-preset-tint-end}'
@@ -114,8 +132,9 @@ agent_apply_preset() {
 
     for agent_option in window-status-format window-status-current-format status-right; do
         agent_original=$(agent_tmux show-options -gqv "$agent_option")
-        agent_clean=$agent_original
+        agent_clean=$(agent_replace_token "$agent_original" "$agent_flags" "$agent_default_flags")
         for agent_marker in "$agent_open" "$agent_close" "$agent_icon" "$agent_other" \
+            "$agent_icon_pad" "$agent_flags_pad" \
             "$agent_tint_bg" "$agent_tint_fg" "$agent_tint_end"; do
             agent_clean=$(agent_remove_token "$agent_clean" "$agent_marker")
         done
