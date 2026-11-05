@@ -23,6 +23,3 @@ corner, but this is not independent OS-notification delivery.
 This plugin aggregates activity within one tmux server. If you already use a
 custom title relay to display inner-server activity on an outer server, keep
 that relay separate; installing this plugin does not create one.
-
-No macOS runtime validation has been performed from the Linux development
-host. The integration suite and CI workflow are prepared for a Mac runner.

@@ -62,8 +62,8 @@ jobs:
               awk 'BEGIN { printf "::error title=integration::" } { printf "%s%%0A", $0 } END { print "" }'
             exit 1
           fi
-      - name: Release metadata and documentation
-        run: python3 tools/check_release.py
+      - name: Version metadata and documentation links
+        run: python3 tools/check_docs.py
   claude-adapter:
     runs-on: ubuntu-latest
     steps:

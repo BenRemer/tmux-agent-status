@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- `agent-status.tmux --uninstall` removes everything the plugin set: preset
+  tokens, the completion-bell hook, and its options. Before this, removing
+  the plugin left the completion bell ringing until tmux restarted.
+- The compact preset handles more themes, now covered by fixture tests built
+  from catppuccin, dracula, nord, gruvbox, onedark, tmux-power and themepack:
+  - catppuccin's palette references (`bg=#{@thm_blue}`) take the accent;
+  - a second content block counts as part of the tab;
+  - reversed separator caps keep their colors;
+  - the icon stays inside the tab when a style conditional, such as
+    gruvbox's, follows the label.
+- Slimmer repository: the validation record, contributing guide, issue and
+  PR templates, and release-packaging workflow are gone. Development commands
+  are in the README and known limitations in Troubleshooting.
 - New completion bell: when a recognized agent's busy title turns idle, the
   plugin rings that tab's bell. Codex now needs no setup. Antigravity needs
   only the title adapter, not its notification setting. It runs only tmux
@@ -59,8 +72,7 @@ First public beta package, prepared October 30, 2026.
 ### Beta limitations
 
 - macOS tests are configured in CI but have not yet run on the hosted repository.
-- Agent versions can change title and notification behavior; see
-  [validation.md](validation.md) for the exact evidence.
+- Agent versions can change title and notification behavior.
 - Notifications use native tmux window flags. They are not a per-pane inbox and
   do not survive a tmux server restart.
 - Claude's active turn includes time waiting for tool permission.

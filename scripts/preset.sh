@@ -19,8 +19,8 @@ agent_replace_token() {
 
 agent_remove_token() { agent_replace_token "$1" "$2" ''; }
 
-# The literal bg/fg color in effect where the tab label (#I or #W) starts.
-agent_tab_color() {
+# The text before the first window label (#I or #W) in a format.
+agent_label_prefix() {
     agent_label=$1
     for agent_name in '#I' '#W' '#{window_index}' '#{window_name}'; do
         agent_before=${1%%"$agent_name"*}
@@ -28,33 +28,84 @@ agent_tab_color() {
             agent_label=$agent_before
         fi
     done
-    case "$agent_label" in *"$2="*) ;; *) return ;; esac
-    agent_color=${agent_label##*"$2="}
-    agent_color=${agent_color%%[], ]*}
+    printf '%s' "$agent_label"
+}
+
+# The bg or fg color the last style in $1 sets, if it is a literal color or
+# an option reference such as #{@thm_blue}. Reversed styles draw separators
+# from the surrounding colors, so they do not name the tab's colors.
+agent_segment_color() {
+    agent_rest=$1
+    agent_color=
+    while :; do
+        case "$agent_rest" in *'#['*) ;; *) break ;; esac
+        agent_rest=${agent_rest#*'#['}
+        agent_style=${agent_rest%%']'*}
+        case ",$agent_style," in *,reverse,*) continue ;; esac
+        agent_items=$agent_style,
+        while [ -n "$agent_items" ]; do
+            agent_item=${agent_items%%[, ]*}
+            agent_items=${agent_items#*[, ]}
+            case "$agent_item" in "$2="*) agent_color=${agent_item#"$2="} ;; esac
+        done
+    done
     case "$agent_color" in
+        '#{@'*'}')
+            case "${agent_color#'#{@'}" in *[!A-Za-z0-9_-]'}'|*'{'*) return ;; esac
+            printf '%s' "$agent_color"
+            ;;
         ''|*[!#A-Za-z0-9]*|default|terminal) ;;
         *) printf '%s' "$agent_color" ;;
     esac
 }
 
-# Themes that draw tabs with inline colors override the wrapping accent, so
-# route the tab's own colors (including separator glyphs) through the accent.
-agent_tint() {
+# Route every use of one tab color through the accent. A background color is
+# also a separator's foreground, so both keys follow it.
+agent_tint_color() {
     agent_tinted=$1
-    agent_bg=$(agent_tab_color "$1" bg)
-    agent_fg=$(agent_tab_color "$1" fg)
     for agent_end in ',' ']' ' '; do
-        if [ -n "$agent_bg" ]; then
+        if [ "$3" = bg ]; then
             for agent_key in bg fg; do
                 agent_tinted=$(agent_replace_token "$agent_tinted" \
-                    "$agent_key=$agent_bg$agent_end" \
-                    "$agent_key=$agent_tint_bg$agent_bg$agent_tint_end$agent_end")
+                    "$agent_key=$2$agent_end" \
+                    "$agent_key=$agent_tint_bg$2$agent_tint_end$agent_end")
             done
-        fi
-        if [ -n "$agent_fg" ] && [ "$agent_fg" != "$agent_bg" ]; then
+        else
             agent_tinted=$(agent_replace_token "$agent_tinted" \
-                "fg=$agent_fg$agent_end" "fg=$agent_tint_fg$agent_fg$agent_tint_end$agent_end")
+                "fg=$2$agent_end" "fg=$agent_tint_fg$2$agent_tint_end$agent_end")
         fi
+    done
+    printf '%s' "$agent_tinted"
+}
+
+# Themes that draw tabs with inline colors override the wrapping accent, so
+# route the tab's own colors (including separator glyphs) through the accent:
+# the colors where the label starts, and those where the icon sits.
+agent_tint() {
+    agent_tinted=$1
+    agent_prefixes=$(agent_label_prefix "$1")
+    case "$1" in
+        *"$agent_icon") agent_at_icon= ;;  # Appended after the tab: skip.
+        *"$agent_icon"*) agent_at_icon=${1%%"$agent_icon"*} ;;
+        *) agent_at_icon= ;;
+    esac
+    agent_bgs=
+    agent_fgs=
+    for agent_prefix in "$agent_prefixes" "$agent_at_icon"; do
+        [ -n "$agent_prefix" ] || continue
+        agent_bgs="$agent_bgs $(agent_segment_color "$agent_prefix" bg)"
+        agent_fgs="$agent_fgs $(agent_segment_color "$agent_prefix" fg)"
+    done
+    agent_done=' '
+    for agent_bg in $agent_bgs; do
+        case "$agent_done" in *" $agent_bg "*) continue ;; esac
+        agent_tinted=$(agent_tint_color "$agent_tinted" "$agent_bg" bg)
+        agent_done="$agent_done$agent_bg "
+    done
+    for agent_fg in $agent_fgs; do
+        case "$agent_done" in *" $agent_fg "*) continue ;; esac
+        agent_tinted=$(agent_tint_color "$agent_tinted" "$agent_fg" fg)
+        agent_done="$agent_done$agent_fg "
     done
     printf '%s' "$agent_tinted"
 }
@@ -82,21 +133,57 @@ agent_lead_pad() {
     printf '%s' "$agent_prefix$agent_icon_pad${1#"$agent_prefix"}"
 }
 
-# Put the icon inside the tab, before its trailing padding and any closing
-# style and separator that follow the label, outside any #{...}. Otherwise
-# append it.
+# The start of the #{...} group that ends $1, or nothing if $1 does not end
+# in one. Byte-based so the shell can split the string with it.
+agent_last_group_prefix() {
+    AGENT_TEXT=$1 LC_ALL=C awk 'BEGIN {
+        s = ENVIRON["AGENT_TEXT"]; depth = 0
+        if (substr(s, length(s), 1) != "}") exit
+        for (i = length(s); i > 1; i--) {
+            c = substr(s, i, 1)
+            if (c == "}") depth++
+            else if (c == "{" && --depth == 0) {
+                if (substr(s, i - 1, 1) == "#") printf "%s", substr(s, 1, i - 2)
+                exit
+            }
+        }
+    }'
+}
+
+# Put the icon inside the tab: after the label and the tab's content, before
+# its trailing padding, closing styles and separators. Otherwise append it.
 agent_place_icon() {
-    case "$1" in
-        *'#['*)
-            agent_head=${1%'#['*}
-            agent_tail=${1#"$agent_head"}
-            ;;
-        *) agent_head=$1; agent_tail= ;;
-    esac
-    # A last style that comes before the label opens the tab; it does not close it.
-    case "$agent_tail" in
-        *'#I'*|*'#W'*|*'#{window_index}'*|*'#{window_name}'*) agent_head=$1; agent_tail= ;;
-    esac
+    agent_head=$1
+    agent_tail=
+    while :; do
+        # A trailing style followed only by separator glyphs or spaces closes
+        # the tab. A style followed by text or formats starts more content.
+        case "$agent_head" in
+            *'#['*)
+                agent_before=${agent_head%'#['*}
+                agent_segment=${agent_head#"$agent_before"}
+                case "$agent_segment" in *']'*) ;; *) break ;; esac
+                case "${agent_segment#*']'}" in *[A-Za-z0-9#{}]*) ;; *)
+                    agent_head=$agent_before
+                    agent_tail=$agent_segment$agent_tail
+                    continue
+                    ;;
+                esac
+                ;;
+        esac
+        # A trailing conditional that switches styles, such as one choosing
+        # the separator's background, also closes the tab.
+        agent_before=$(agent_last_group_prefix "$agent_head")
+        agent_segment=${agent_head#"$agent_before"}
+        case "$agent_segment" in
+            '#{'*'#['*)
+                agent_head=$agent_before
+                agent_tail=$agent_segment$agent_tail
+                continue
+                ;;
+        esac
+        break
+    done
     agent_opens=$(printf '%s' "$agent_head" | tr -cd '{' | wc -c)
     agent_closes=$(printf '%s' "$agent_head" | tr -cd '}' | wc -c)
     case "$agent_head" in

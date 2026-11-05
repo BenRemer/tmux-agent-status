@@ -9,9 +9,7 @@ notification channel, or rings the bell itself when that channel cannot reach
 tmux. See [Bells](#bells-and-preferrednotifchannel). Cancellation and subagent
 completion do not ring.
 
-Requires Claude Code with mods support. Validated with public Claude Code
-2.1.314, with activity and completion also confirmed in live desktop use.
-Older clients that cannot load hook modules need an upgrade.
+Requires Claude Code with mods support (2.1.314 or later).
 
 With tmux-agent-status installed at its usual path, load this adapter for one
 Claude session:

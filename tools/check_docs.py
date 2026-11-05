@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check release metadata and local Markdown links without third-party modules."""
+"""Check version metadata and local Markdown links without third-party modules."""
 import json
 from pathlib import Path
 import re
@@ -43,7 +43,7 @@ def check(root=ROOT):
                 errors.append(f"{path.relative_to(root)} links to missing file: {target}")
     if errors:
         raise SystemExit("\n".join(errors))
-    print(f"Release metadata and local documentation links pass ({version}).")
+    print(f"Version metadata and local documentation links pass ({version}).")
     return version
 
 

@@ -5,12 +5,19 @@ set -eu
 agent_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 agent_bin=${TMUX_BIN:-tmux}
 agent_socket=
-if [ "${1-}" = "--socket" ] && [ "$#" -eq 2 ]; then
-    agent_socket=$2
-elif [ "$#" -ne 0 ]; then
-    printf '%s\n' 'Usage: agent-status.tmux [--socket PATH]' >&2
+agent_uninstall=
+agent_usage() {
+    printf '%s\n' 'Usage: agent-status.tmux [--socket PATH] [--uninstall]' >&2
     exit 2
-elif [ -n "${TMUX-}" ]; then
+}
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --socket) [ "$#" -ge 2 ] || agent_usage; agent_socket=$2; shift 2 ;;
+        --uninstall) agent_uninstall=1; shift ;;
+        *) agent_usage ;;
+    esac
+done
+if [ -z "$agent_socket" ] && [ -n "${TMUX-}" ]; then
     # The final two comma-separated fields are the server PID and session ID.
     agent_socket=${TMUX%,*}
     agent_socket=${agent_socket%,*}
@@ -49,6 +56,27 @@ if [ "$agent_major" -lt 3 ] ||
    { [ "$agent_major" -eq 3 ] && [ "$agent_minor" -lt 4 ]; }; then
     agent_warn 'tmux 3.4 or newer is required; no settings changed.'
     exit 1
+fi
+
+agent_hook='pane-title-changed[4721]'
+
+# Undo everything the plugin set on this server: preset tokens in the
+# user's formats, the completion-bell hook, and every plugin option.
+if [ -n "$agent_uninstall" ]; then
+    # shellcheck source=scripts/preset.sh
+    . "$agent_dir/scripts/preset.sh"
+    agent_apply_preset none
+    agent_tmux set-hook -gu "$agent_hook"
+    agent_tmux show-options -g | sed -n 's/^\(@agent-status-[^ ]*\).*/\1/p' |
+        while IFS= read -r agent_name; do
+            agent_tmux set-option -gu "$agent_name"
+        done
+    agent_tmux list-panes -a -F '#{pane_id}' | while IFS= read -r agent_pane; do
+        for agent_name in @agent-status-busy-command @agent-status-internal-title-busy; do
+            agent_tmux set-option -pu -t "$agent_pane" "$agent_name" 2>/dev/null || :
+        done
+    done
+    exit 0
 fi
 
 agent_mode=$(agent_input @agent-status-preset none)
@@ -127,7 +155,6 @@ agent_tmux source-file "$agent_dir/agent-status.conf"
 # agents (Codex, agy) need no notification setup. tmux commands only; the
 # shell runs once per completed turn, never per title frame. A marker left by
 # an agent that exited is cleared without ringing.
-agent_hook='pane-title-changed[4721]'
 if [ "$agent_completion_bell" = on ]; then
     agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{E:@agent-status-internal-pane-busy-title}' 'set-option -p @agent-status-internal-title-busy 1' { if-shell -F '#{@agent-status-internal-title-busy}' { set-option -pu @agent-status-internal-title-busy ; if-shell -F '#{E:@agent-status-internal-pane}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } } }"
 else

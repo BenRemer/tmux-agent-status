@@ -170,5 +170,18 @@ tmux run-shell '~/.tmux/plugins/tmux-agent-status/agent-status.tmux'
 The plugin reports unsupported tmux versions, invalid recognition patterns,
 unknown presets, and unsupported automatic-placement layouts.
 
-If reporting an issue, include only the relevant settings and sanitized
-diagnostics. See [CONTRIBUTING.md](../CONTRIBUTING.md).
+When reporting an issue, include your OS, terminal, `tmux -V`, the agent's
+version, and the diagnostics above. Leave out transcripts and full configs.
+
+## Known limitations
+
+- Bells belong to windows, not panes. Viewing a window acknowledges its bell,
+  and another client viewing the same window can acknowledge it too.
+- Bells do not survive a tmux server restart.
+- Other-session indicators cover one tmux server. A nested or remote tmux
+  does not report into the outer status bar; see
+  [nested tmux](../examples/nested-tmux.md).
+- Custom `status-format` layouts need manual token placement.
+- The compact preset tints a theme's inline tab colors only when they are
+  literal colors set before the window index or name.
+- Claude's running turn includes time spent waiting for tool permission.

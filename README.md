@@ -33,9 +33,8 @@ No daemon, transcript scraping, model requests, or shell polling during status
 refreshes. The core uses native tmux formats; optional adapters report Claude
 turn events or Antigravity's activity title.
 
-> **Beta:** tmux 3.4+ is required. Linux is locally verified; macOS is locally
-> verified for unreleased changes, and hosted macOS CI is pending. See the precise
-> [compatibility and validation record](validation.md).
+Requires **tmux 3.4+**, on Linux or macOS. This is a beta: options may still
+change between releases.
 
 ## Install
 
@@ -143,10 +142,9 @@ Without `terminal_bell`, Claude's own notifications never reach tmux. For
 example, a tab waiting on a permission prompt gets no bell. The adapter only
 covers turn completion, so set `terminal_bell` to get both.
 
-The adapter is tested with **public Claude Code 2.1.314**. See
-[adapter details](adapters/claude/README.md) for one-session loading, behavior,
-and uninstall instructions. Earlier versions without mods support cannot
-load this adapter.
+The adapter needs a Claude Code version with mods support (2.1.314 or later).
+See [adapter details](adapters/claude/README.md) for one-session loading,
+behavior, and uninstall instructions.
 
 ### Antigravity (`agy`)
 
@@ -154,9 +152,8 @@ load this adapter.
 title command. Install the
 [title adapter](adapters/antigravity/README.md). It shows a spinner while agy
 works, which gives you both the running cog and the completion bell. You don't
-need agy's `"notifications": true` for tmux. The adapter is currently
-available on the `dev` branch, after beta.2. It is not included in the beta.2
-archive. Live Antigravity activity detection has not yet been verified.
+need agy's `"notifications": true` for tmux. Antigravity support is new and
+less tested than Codex and Claude.
 
 ### Other agents
 
@@ -292,20 +289,40 @@ Upgrade TPM installations with **prefix + U**. For a manual checkout, fetch
 tags and check out the desired release, then reload your tmux config. Read the
 [changelog](CHANGELOG.md) before upgrading a beta.
 
-To remove preset styling, set `@agent-status-preset 'none'` and reload **while
-the plugin is still installed**. Then remove its load entry and any manually
-inserted tokens. If installed, remove the Claude adapter symlink and restart
-Claude too. Do not kill your tmux server to uninstall.
+To uninstall, run this **while the plugin is still installed**:
 
-## Help and contributions
+```sh
+tmux run-shell '~/.tmux/plugins/tmux-agent-status/agent-status.tmux --uninstall'
+```
 
-- [Troubleshooting](docs/TROUBLESHOOTING.md): missing bells, title detection,
-  themes, nested tmux, and terminal flashes.
-- [Validation record](validation.md): tested versions and known limitations.
-- [Contributing](CONTRIBUTING.md): local tests and bug-report details.
-- [Report an issue](https://github.com/benremer/tmux-agent-status/issues).
+It restores your window and status formats and removes the completion-bell
+hook and every `@agent-status-*` option, without restarting tmux. Then remove
+the plugin's lines from `~/.tmux.conf`, plus any tokens you placed manually.
+If you installed the Claude adapter, remove its symlink and restart Claude.
 
-The images show real output from an isolated demo server, with explanatory
-captions and a sample base theme. [Image source and regeneration](docs/images/README.md).
+To keep the plugin but drop only the preset styling, set
+`@agent-status-preset 'none'` and reload.
 
-Licensed under [MIT](LICENSE). Use it, modify it, and share it.
+## Help
+
+[Troubleshooting](docs/TROUBLESHOOTING.md) covers missing bells, title
+detection, themes, nested tmux, terminal flashes, and known limitations.
+Found a bug? [Open an issue](https://github.com/benremer/tmux-agent-status/issues).
+
+## Development
+
+The core is POSIX shell and tmux formats. The tests start disposable tmux
+servers and never touch yours:
+
+```sh
+shellcheck -x -s sh agent-status.tmux scripts/preset.sh
+python3 tests/integration.py         # TMUX_BIN=/path/to/tmux to pick a build
+python3 tools/check_docs.py          # versions and local doc links
+claude plugin test adapters/claude   # Claude adapter event tests
+```
+
+`tests/benchmark.py` measures format latency and server CPU with many busy
+agents. The screenshots are rendered from a real tmux server; see
+[docs/images](docs/images/README.md) to regenerate them.
+
+Licensed under [MIT](LICENSE).

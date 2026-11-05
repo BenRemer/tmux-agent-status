@@ -22,6 +22,41 @@ TMUX = os.environ.get("TMUX_BIN", shutil.which("tmux"))
 PUBLIC = "#{E:@agent-status-window}"
 OTHER = "#{E:@agent-status-other}"
 BELL = "\uf0f3"  # Default Nerd Font bell
+RUNNING_BG = "#30464b"  # The compact preset's running accent
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from themes import THEMES  # noqa: E402
+
+
+def render_cells(expanded):
+    """(char, bg) for each visible character of an expanded tmux format.
+
+    Follows the style rules the preset relies on: bg=/fg=, default,
+    push-default/pop-default, reverse and none. Unset colors are None.
+    """
+    cells = []
+    fg = bg = base_fg = base_bg = None
+    reverse = False
+    for style, text in re.findall(r"#\[([^]]*)\]|([^#]+|#)", expanded):
+        if text:
+            cells += [(ch, fg if reverse else bg) for ch in text]
+            continue
+        for item in re.split(r"[ ,]+", style):
+            if item.startswith("bg="):
+                bg = None if item[3:] == "default" else item[3:]
+            elif item.startswith("fg="):
+                fg = None if item[3:] == "default" else item[3:]
+            elif item == "default":
+                fg, bg = base_fg, base_bg
+            elif item == "push-default":
+                base_fg, base_bg = fg, bg
+            elif item == "pop-default":
+                base_fg = base_bg = None
+            elif item == "reverse":
+                reverse = True
+            elif item in ("none", "noreverse"):
+                reverse = False
+    return cells
 
 
 _FIXTURE_TEMP = None
@@ -181,6 +216,11 @@ class Server:
     def option(self, key):
         return self.tm("show-options", "-gqv", key)
 
+    def raw_option(self, key):
+        # tm() strips whitespace, which is part of a format's padding.
+        # #{option} inserts the value without expanding it.
+        return self.eval("A:0", f"[#{{{key}}}]")[1:-1]
+
     def close(self):
         self.tm("kill-server", check=False)
         for process, master, reader, _ in self.clients:
@@ -256,6 +296,23 @@ class Integration(unittest.TestCase):
         self.s.tm("set-option", "-g", "@agent-status-completion-bell", "off")
         self.s.load()
         self.assertNotIn("[4721]", self.s.tm("show-hooks", "-g", "pane-title-changed"))
+
+    def test_uninstall_removes_everything_the_plugin_set(self):
+        formats = {key: self.s.option(key) for key in
+                   ("window-status-format", "window-status-current-format", "status-right")}
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        a = self.s.agent()
+        self.s.load("compact")
+        self.s.busy(a)
+        self.s.tm("set-option", "-p", "-t", a, "@agent-status-busy-command", "codex")
+        r = subprocess.run([str(ROOT / "agent-status.tmux"), "--socket", self.s.socket,
+                            "--uninstall"], env=self.s.env, capture_output=True, text=True,
+                           timeout=10)
+        self.assertEqual(0, r.returncode, r.stderr)
+        self.assertEqual(formats, {key: self.s.option(key) for key in formats})
+        self.assertNotIn("@agent-status", self.s.tm("show-options", "-g"))
+        self.assertNotIn("[4721]", self.s.tm("show-hooks", "-g", "pane-title-changed"))
+        self.assertNotIn("@agent-status", self.s.tm("show-options", "-p", "-t", a))
 
     def test_recognition_busy_idle_hidden_and_dead(self):
         a = self.s.agent()
@@ -492,9 +549,68 @@ class Integration(unittest.TestCase):
         self.assertRegex(busy, r"^\[ 1 \S+ ⚙ \]$")
         self.assertRegex(idle, r"^\[1 \S+\]$")
 
-    def test_compact_icon_falls_back_to_the_end(self):
-        # A closing style inside a conditional is not a safe insertion point.
+    def test_compact_preset_with_popular_themes(self):
+        for name, (inactive, current, options) in THEMES.items():
+            with self.subTest(theme=name):
+                self.check_theme(inactive, current, options)
+
+    def check_theme(self, inactive, current, options):
+        s = Server()
+        self.addCleanup(s.close)
+        for key, value in options.items():
+            s.tm("set-option", "-g", key, value)
+        s.tm("set-option", "-g", "window-status-format", inactive)
+        s.tm("set-option", "-g", "window-status-current-format", current)
+        a = s.agent()
+        s.tm("set-option", "-w", "-t", a, "automatic-rename", "off")
+        s.tm("rename-window", "-t", a, "agent")
+        # Brackets keep tm() from stripping the format's own padding.
+        cells = lambda option: render_cells(s.eval(a, f"[#{{E:{option}}}]"))[1:-1]
+        for option, accent in (("window-status-format", RUNNING_BG),
+                               ("window-status-current-format", None)):
+            if accent is None:
+                s.tm("select-window", "-t", a)
+            s.load("none")
+            original = cells(option)
+            s.load("compact")
+            # Idle tabs look exactly as they did without the preset.
+            self.assertEqual(original, cells(option), f"idle {option}")
+            s.busy(a)
+            busy = cells(option)
+            s.busy(a, False)
+            text = "".join(ch for ch, _ in busy)
+            self.assertEqual(1, text.count("⚙"), f"{option}: {text!r}")
+            i = text.index("⚙")
+            # The icon sits in the tab body, with padding after it in the same color.
+            self.assertGreater(i, 1, f"{option}: {text!r}")
+            self.assertEqual(" ", text[i - 1], f"{option}: {text!r}")
+            self.assertLess(i + 1, len(text), f"{option} ends at the icon: {text!r}")
+            self.assertEqual(busy[i - 1][1], busy[i][1], f"{option}: {busy!r}")
+            self.assertEqual(busy[i][1], busy[i + 1][1], f"{option}: {busy!r}")
+            # An inactive busy tab takes the accent, including at the icon.
+            if accent:
+                self.assertEqual(accent, busy[i][1], f"{option}: {busy!r}")
+                index = text.index("1")
+                self.assertEqual(accent, busy[index][1], f"{option}: {busy!r}")
+                self.assertGreater(index, 0, f"{option} starts at the label: {text!r}")
+                self.assertEqual(accent, busy[index - 1][1], f"{option}: {busy!r}")
+        s.load("none")
+        self.assertEqual(inactive, s.raw_option("window-status-format"))
+        self.assertEqual(current, s.raw_option("window-status-current-format"))
+
+    def test_compact_icon_goes_before_a_trailing_style_conditional(self):
         theme = "#[bg=#363a4f] #W#{?window_bell_flag,#[bg=red] BELL,}"
+        self.s.tm("set-option", "-g", "window-status-format", theme)
+        self.s.load("compact")
+        self.assertIn("#W#{E:@agent-status-internal-preset-window-icon}"
+                      "#{E:@agent-status-internal-preset-window-pad}#{?window_bell_flag,",
+                      self.s.option("window-status-format"))
+        self.s.load("none")
+        self.assertEqual(theme, self.s.option("window-status-format"))
+
+    def test_compact_icon_falls_back_to_the_end(self):
+        # Without a window label there is no tab content to place the icon after.
+        theme = "#[bg=#363a4f] #T"
         self.s.tm("set-option", "-g", "window-status-format", theme)
         self.s.load("compact")
         self.assertTrue(self.s.option("window-status-format").endswith(
