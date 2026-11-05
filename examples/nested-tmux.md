@@ -1,8 +1,14 @@
 # Nested tmux and SSH
 
-The plugin can be loaded independently in either server. Its entry point uses
-the invoking server's socket. Do not assume the outer server can see process
-names or pane titles inside the inner server.
+Load the plugin in both servers. For the outer tmux to show the inner
+server's agents on its SSH tab, turn on the relay in the **inner** server:
+
+```tmux
+set -g @agent-status-relay on
+```
+
+See [Remote tmux over SSH](../README.md#remote-tmux-over-ssh) for what the
+outer tab shows and the options that go with it.
 
 For terminal bells to reach the outer layer, configure each relevant layer:
 
@@ -20,6 +26,8 @@ Live forwarding requires an attached client. An agent in a detached session
 can leave a native bell flag, which the plugin shows in another session's
 corner, but this is not independent OS-notification delivery.
 
-This plugin aggregates activity within one tmux server. If you already use a
-custom title relay to display inner-server activity on an outer server, keep
-that relay separate; installing this plugin does not create one.
+If you set `pane-title-changed` hooks of your own, give them an index, such
+as `set-hook -g 'pane-title-changed[0]' …`. A hook set without an index
+replaces every `pane-title-changed` hook, including the plugin's completion
+bell. Avoid setting pane options on every title change, too: tmux redraws the
+whole pane each time, and the relay title changes every second.

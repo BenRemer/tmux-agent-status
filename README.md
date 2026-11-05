@@ -20,6 +20,7 @@ working in another session, and come back when a tab has something for you.
 | ⚙ | An agent is working. The compact preset adds a soft tab accent. |
 | <img src="docs/images/bell.png" alt="bell" height="16"> | A window has an unread terminal bell. Visit that window to acknowledge it. |
 | Corner ⚙ / <img src="docs/images/bell.png" alt="bell" height="16"> | Work or notifications exist in another session on this tmux server. |
+| Broken link (stale) | An SSH tab's [remote tmux](#remote-tmux-over-ssh) stopped reporting. |
 | No icon | No work or notification to show. |
 
 The bell is a [Nerd Font](https://www.nerdfonts.com/) glyph, sized like the
@@ -82,6 +83,7 @@ Existing sessions can stay running.
 | Claude Code | Install the adapter | Install the adapter; `terminal_bell` recommended |
 | Antigravity (`agy`) | Install the title adapter | Included with the title adapter |
 | Other agents | A busy title or an adapter | Included with a busy title |
+| Agents in a [remote tmux over SSH](#remote-tmux-over-ssh) | One option on the remote | Included |
 
 For agents that show a spinner in their terminal title, the plugin rings the
 tab's bell itself when the spinner goes away. That is the
@@ -182,6 +184,41 @@ Turn it off with `set -g @agent-status-completion-bell off`, for example if
 your agent already rings its own bell at completion. Claude's adapter rings
 its own bell, so this setting does not affect Claude.
 
+### Remote tmux over SSH
+
+If your agents run in a tmux on another machine, the SSH tab on your local
+tmux can show them like local agents. Install the plugin on both machines,
+and turn on the relay **on the remote**:
+
+```tmux
+set -g @agent-status-relay on
+```
+
+The local side needs nothing. The SSH tab then stands for the whole remote
+tmux, every session included:
+
+- While any remote agent is busy, it gets the running cog and accent.
+- While any remote window has an unread bell, it shows the bell. That bell
+  clears when you view the window on the remote, not when you open the SSH
+  tab.
+- Your other local sessions see both in the corner.
+
+The remote publishes `agents BUSY/TOTAL !BELLS ~TIME` in its terminal title. That
+needs a `status-interval` between 1 and 15 on the remote. Without agents, it
+uses your own `set-titles-string`. Your local tmux reads the title from any
+pane running `ssh`, `mosh-client`, or `et`. If the title is more than 30
+seconds old, the tab shows the stale icon, a broken link (U+F127), instead of
+the cog. That usually means a hung connection.
+
+A tab shows one icon: an unread bell, otherwise stale, otherwise running. To
+also show how many remote agents are busy (`⚙ 2/3`):
+
+```tmux
+set -g @agent-status-relay-count on
+```
+
+Set this one on your local tmux.
+
 ## Choose your layout
 
 Use the **compact preset** for automatic placement and color accents. Use
@@ -267,6 +304,11 @@ Set options before the plugin loads, then reload to apply them.
 | `@agent-status-running-style` | Inherit in manual mode; soft teal in compact mode |
 | `@agent-status-bell-style` | Inherit in manual mode; amber in compact mode |
 | `@agent-status-completion-bell` | `on`; rings a tab's bell when its agent's busy title turns idle |
+| `@agent-status-stale-icon` | From `@agent-status-icons`: a broken link (U+F127, `nf-fa-chain_broken`), or ⚠ for `emoji` |
+| `@agent-status-stale-style` | Inherit in manual mode; muted red in compact mode |
+| `@agent-status-relay` | `off`; on a remote tmux, publish its agents to the local tmux over SSH |
+| `@agent-status-relay-count` | `off`; show remote busy/total counts next to the cog |
+| `@agent-status-relay-command-pattern` | `^(ssh\|mosh-client\|et)$`; panes whose title may carry a relay |
 
 For example:
 

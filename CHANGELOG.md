@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Remote tmux over SSH: set `@agent-status-relay on` on the remote, and the
+  local SSH tab shows the whole remote tmux like a local agent tab: the cog
+  while any remote agent is busy, the bell while any remote window has an
+  unread bell (including bells in sessions the remote client isn't viewing),
+  and both in the corner from other sessions. Claude panes count through
+  their adapter. A
+  relay older than 30 seconds shows the new stale icon (a broken link,
+  `@agent-status-stale-icon`), styled with `@agent-status-stale-style`.
+  `@agent-status-relay-count on` adds busy/total counts (`⚙ 2/3`).
+  `--uninstall` restores the remote's own title settings.
 - `agent-status.tmux --uninstall` removes everything the plugin set: preset
   tokens, the completion-bell hook, and its options. Before this, removing
   the plugin left the completion bell ringing until tmux restarted.

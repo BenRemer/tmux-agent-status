@@ -225,9 +225,15 @@ agent_apply_preset() {
     agent_flags='#{E:@agent-status-internal-preset-window-flags}'
     agent_flags_pad='#{E:@agent-status-internal-preset-window-flags-pad}'
     agent_default_flags='#{?window_flags,#{window_flags}, }'
-    agent_tint_bg='#{?#{E:@agent-status-internal-preset-bell-bg},#{@agent-status-internal-bell-bg},#{?#{E:@agent-status-internal-preset-running-bg},#{@agent-status-internal-running-bg},'
-    agent_tint_fg='#{?#{E:@agent-status-internal-preset-bell-fg},#{@agent-status-internal-bell-fg},#{?#{E:@agent-status-internal-preset-running-fg},#{@agent-status-internal-running-fg},'
-    agent_tint_end='}}#{@agent-status-internal-preset-tint-end}'
+    # Each tinted color picks the bell, stale, or running accent, else its own.
+    agent_tint_bg='#{?#{E:@agent-status-internal-preset-bell-bg},#{@agent-status-internal-bell-bg},#{?#{E:@agent-status-internal-preset-stale-bg},#{@agent-status-internal-stale-bg},#{?#{E:@agent-status-internal-preset-running-bg},#{@agent-status-internal-running-bg},'
+    agent_tint_fg='#{?#{E:@agent-status-internal-preset-bell-fg},#{@agent-status-internal-bell-fg},#{?#{E:@agent-status-internal-preset-stale-fg},#{@agent-status-internal-stale-fg},#{?#{E:@agent-status-internal-preset-running-fg},#{@agent-status-internal-running-fg},'
+    agent_tint_end='}}}#{@agent-status-internal-preset-tint-end}'
+    # The tint before stale accents existed, so formats applied by an older
+    # version still clean up.
+    agent_legacy_tint_bg='#{?#{E:@agent-status-internal-preset-bell-bg},#{@agent-status-internal-bell-bg},#{?#{E:@agent-status-internal-preset-running-bg},#{@agent-status-internal-running-bg},'
+    agent_legacy_tint_fg='#{?#{E:@agent-status-internal-preset-bell-fg},#{@agent-status-internal-bell-fg},#{?#{E:@agent-status-internal-preset-running-fg},#{@agent-status-internal-running-fg},'
+    agent_legacy_tint_end='}}#{@agent-status-internal-preset-tint-end}'
 
     # Do not pretend to integrate into a completely custom status layout.
     if [ "$agent_preset_mode" = compact ]; then
@@ -246,7 +252,8 @@ agent_apply_preset() {
         agent_clean=$(agent_replace_token "$agent_original" "$agent_flags" "$agent_default_flags")
         for agent_marker in "$agent_open" "$agent_close" "$agent_icon" "$agent_other" \
             "$agent_icon_pad" "$agent_flags_pad" \
-            "$agent_tint_bg" "$agent_tint_fg" "$agent_tint_end"; do
+            "$agent_tint_bg" "$agent_tint_fg" "$agent_tint_end" \
+            "$agent_legacy_tint_bg" "$agent_legacy_tint_fg" "$agent_legacy_tint_end"; do
             agent_clean=$(agent_remove_token "$agent_clean" "$agent_marker")
         done
         case "$agent_clean" in

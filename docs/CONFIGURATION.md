@@ -23,6 +23,7 @@ it falls back to wrapping the tab and appending the icon.
 | `@agent-status-icons` | `nerd-font` | `nerd-font` |
 | `@agent-status-running-icon` | `⚙` | `⚙` |
 | `@agent-status-bell-icon` | <img src="images/bell.png" alt="bell" height="16"> (U+F0F3) | <img src="images/bell.png" alt="bell" height="16"> (U+F0F3) |
+| `@agent-status-stale-icon` | Broken link (U+F127) | Broken link (U+F127) |
 
 The default bell is the Nerd Font bell <img src="images/bell.png" alt="bell" height="16"> (U+F0F3, `nf-fa-bell`), which is text-sized
 like the cog. `@agent-status-icons 'emoji'` uses 🔔 instead, for terminals
@@ -31,6 +32,7 @@ override either set. tmux cannot query the terminal's font, so the plugin
 cannot detect which set will display.
 | `@agent-status-running-style` | Inherit | `bg=#30464b,fg=#cad3f5` |
 | `@agent-status-bell-style` | Inherit | `bg=#eed49f,fg=#181926,bold` |
+| `@agent-status-stale-style` | Inherit | `bg=#4b3036,fg=#f0c6c6` |
 
 Style inputs affect the corner indicators and compact preset accents.
 Window and session text tokens inherit the surrounding style. To add manual
@@ -59,9 +61,9 @@ Expand these with `#{E:...}`:
 
 | Option | Output |
 |---|---|
-| `@agent-status-window` | Bell, otherwise running, otherwise empty |
-| `@agent-status-session` | Running and/or bell for this session |
-| `@agent-status-other` | Running and/or bell for other sessions |
+| `@agent-status-window` | Bell, otherwise stale relay, otherwise running, otherwise empty |
+| `@agent-status-session` | Running, stale, and/or bell for this session |
+| `@agent-status-other` | Running, stale, and/or bell for other sessions |
 
 Window and session text include leading spacing. Corner badges have padding
 on both sides. All three are empty when idle with no notification.
@@ -71,11 +73,18 @@ Numeric formats expand to `0` or `1`:
 ```text
 @agent-status-window-busy
 @agent-status-window-bell
+@agent-status-window-stale
 @agent-status-session-busy
 @agent-status-session-bell
+@agent-status-session-stale
 @agent-status-other-busy
 @agent-status-other-bell
+@agent-status-other-stale
 ```
+
+`-busy` and `-bell` include a live [relay](../README.md#remote-tmux-over-ssh)
+whose remote has busy agents or unread bells. `-stale` means a relay title
+older than 30 seconds.
 
 For example:
 

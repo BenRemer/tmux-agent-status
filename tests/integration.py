@@ -22,6 +22,7 @@ TMUX = os.environ.get("TMUX_BIN", shutil.which("tmux"))
 PUBLIC = "#{E:@agent-status-window}"
 OTHER = "#{E:@agent-status-other}"
 BELL = "\uf0f3"  # Default Nerd Font bell
+STALE = "\uf127"  # Default Nerd Font stale-relay icon
 RUNNING_BG = "#30464b"  # The compact preset's running accent
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -301,8 +302,11 @@ class Integration(unittest.TestCase):
         formats = {key: self.s.option(key) for key in
                    ("window-status-format", "window-status-current-format", "status-right")}
         self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        titles = self.s.option("set-titles-string")
         a = self.s.agent()
         self.s.load("compact")
+        self.assertNotEqual(titles, self.s.option("set-titles-string"))
         self.s.busy(a)
         self.s.tm("set-option", "-p", "-t", a, "@agent-status-busy-command", "codex")
         r = subprocess.run([str(ROOT / "agent-status.tmux"), "--socket", self.s.socket,
@@ -313,6 +317,130 @@ class Integration(unittest.TestCase):
         self.assertNotIn("@agent-status", self.s.tm("show-options", "-g"))
         self.assertNotIn("[4721]", self.s.tm("show-hooks", "-g", "pane-title-changed"))
         self.assertNotIn("@agent-status", self.s.tm("show-options", "-p", "-t", a))
+        self.assertEqual(titles, self.s.option("set-titles-string"))
+        self.assertEqual("off", self.s.option("set-titles"))
+
+    def relay_title(self, busy, total, age=0, bells=None):
+        unread = "" if bells is None else f" !{bells}"
+        return f"agents {busy}/{total}{unread} ~{int(time.time()) - age}"
+
+    def test_relay_publishes_session_agents_and_restores_titles(self):
+        self.s.tm("set-option", "-g", "set-titles-string", "DEV #S")
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        self.s.load()
+        title = "#{T:set-titles-string}"
+        self.assertEqual("on", self.s.option("set-titles"))
+        # Without agents the user's own title is used.
+        self.assertEqual("DEV A", self.s.eval("A:0", title))
+        a = self.s.agent()
+        self.assertRegex(self.s.eval("A:0", title), r"^agents 0/1 !0 ~[0-9]+$")
+        self.s.busy(a)
+        busy = self.s.eval("A:0", title)
+        self.assertRegex(busy, r"^agents 1/1 !0 ~[0-9]+$")
+        self.assertLess(abs(int(busy.split("~")[1]) - time.time()), 5)
+        # The relay covers the whole server, including other sessions' bells.
+        self.s.tm("new-window", "-d", "-t", "B:5", "sleep 300")
+        self.s.emit("B:5", "\a")
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 1/1 !1 ~[0-9]+$")
+        self.s.load()
+        self.assertEqual("DEV #S", self.s.option("@agent-status-internal-relay-fallback"))
+        self.s.tm("set-option", "-g", "@agent-status-relay", "off")
+        self.s.load()
+        self.assertEqual("DEV #S", self.s.option("set-titles-string"))
+        self.assertEqual("off", self.s.option("set-titles"))
+
+    def test_relay_keeps_non_ascii_titles_without_a_utf8_locale(self):
+        original = "✳ #S ⠋"
+        self.s.tm("set-option", "-g", "set-titles-string", original)
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        env = {k: v for k, v in self.s.env.items() if k not in ("LC_ALL", "LC_CTYPE", "LANG")}
+        env["LANG"] = "C"
+        for relay in ("on", "off"):
+            self.s.tm("set-option", "-g", "@agent-status-relay", relay)
+            r = subprocess.run([str(ROOT / "agent-status.tmux"), "--socket", self.s.socket],
+                               env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(0, r.returncode, r.stderr)
+        self.assertEqual(original, self.s.raw_option("set-titles-string"))
+
+    def test_relay_tab_shows_running_stale_and_bell(self):
+        a = self.s.agent(name="ssh")
+        self.s.load("compact")
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 2)}\x07")
+        self.assertEqual("⚙", self.s.eval(a, PUBLIC))
+        self.assertEqual("1", self.s.eval(a, "#{E:@agent-status-window-busy}"))
+        self.assertIn("⚙", self.s.eval("B:0", OTHER))
+        self.s.emit(a, f"\x1b]2;{self.relay_title(0, 2)}\x07")
+        self.assertEqual("", self.s.eval(a, PUBLIC))
+        # The count is opt-in.
+        self.s.tm("set-option", "-g", "@agent-status-relay-count", "on")
+        self.s.load()
+        self.s.emit(a, f"\x1b]2;{self.relay_title(2, 3)}\x07")
+        self.assertEqual("⚙ 2/3", self.s.eval(a, PUBLIC))
+        # A relay title older than 30 seconds is stale, in the tab and corner.
+        self.s.emit(a, f"\x1b]2;{self.relay_title(2, 3, age=31)}\x07")
+        self.assertEqual(STALE, self.s.eval(a, PUBLIC))
+        self.assertEqual("0", self.s.eval(a, "#{E:@agent-status-window-busy}"))
+        self.assertIn(STALE, self.s.eval("B:0", OTHER))
+        self.assertIn("#4b3036", self.s.eval(a, "#{E:window-status-format}"))
+        # A remote with unread bells gives the tab a bell while the relay is live.
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 3, bells=2)}\x07")
+        self.assertEqual(BELL, self.s.eval(a, PUBLIC))
+        self.assertEqual("0", self.s.eval(a, "#{window_bell_flag}"))
+        self.assertIn(BELL, self.s.eval("B:0", OTHER))
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 3, bells=0)}\x07")
+        self.assertEqual("⚙ 1/3", self.s.eval(a, PUBLIC))
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 3, age=31, bells=2)}\x07")
+        self.assertEqual(STALE, self.s.eval(a, PUBLIC))
+        # A native bell takes the tab; the corner shows both.
+        self.s.emit(a, "\a")
+        self.assertEqual(BELL, self.s.eval(a, PUBLIC))
+        corner = self.s.eval("B:0", OTHER)
+        self.assertIn(STALE, corner)
+        self.assertIn(BELL, corner)
+        self.assertLess(corner.index(STALE), corner.index(BELL))
+
+    def test_relay_title_is_ignored_outside_ssh(self):
+        a = self.s.agent()  # codex, not ssh
+        self.s.load()
+        self.s.tm("new-window", "-d", "-t", "A:2", "sleep 300")
+        self.s.emit("A:2", f"\x1b]2;{self.relay_title(1, 1)}\x07")
+        self.assertEqual("", self.s.eval("A:2", PUBLIC))
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 1)}\x07")
+        self.assertEqual("", self.s.eval(a, PUBLIC))
+
+    def test_relay_end_to_end_through_a_nested_client(self):
+        inner = Server()
+        self.addCleanup(inner.close)
+        inner.tm("set-option", "-g", "@agent-status-relay", "on")
+        inner.load()
+        agent = inner.agent()
+        inner.busy(agent)
+        # The outer pane runs a real tmux client of the inner server, as ssh would.
+        self.s.tm("set-option", "-g", "@agent-status-relay-command-pattern", "^(ssh|tmux)$")
+        self.s.load()
+        attach = f"env -u TMUX TERM=xterm-256color {shlex.quote(TMUX)} -S {shlex.quote(inner.socket)} attach -t A"
+        outer = self.s.tm("new-window", "-d", "-t", "A:3", "-P", "-F", "#{pane_id}", attach)
+        public = "#{E:@agent-status-window}"
+        for _ in range(100):
+            if self.s.eval(outer, public) == "⚙":
+                break
+            time.sleep(.05)
+        self.assertRegex(self.s.eval(outer, "#{pane_title}"), r"^agents 1/1 !0 ~[0-9]+$")
+        self.assertEqual("⚙", self.s.eval(outer, public))
+        inner.busy(agent, False)
+        for _ in range(100):
+            if self.s.eval(outer, public) == "":
+                break
+            time.sleep(.05)
+        self.assertEqual("", self.s.eval(outer, public))
+        # A bell in another inner session never reaches the client as a real
+        # bell; the relay carries it.
+        inner.emit("B:0", "\a")
+        for _ in range(100):
+            if self.s.eval(outer, public) == BELL:
+                break
+            time.sleep(.05)
+        self.assertEqual(BELL, self.s.eval(outer, public))
 
     def test_recognition_busy_idle_hidden_and_dead(self):
         a = self.s.agent()

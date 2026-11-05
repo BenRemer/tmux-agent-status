@@ -173,14 +173,33 @@ unknown presets, and unsupported automatic-placement layouts.
 When reporting an issue, include your OS, terminal, `tmux -V`, the agent's
 version, and the diagnostics above. Leave out transcripts and full configs.
 
+## An SSH tab shows no cog, or the stale icon
+
+On the remote, check that `@agent-status-relay` is `on` and reloaded, and
+that its `status-interval` is between 1 and 15. On the local tmux, inside the
+SSH pane's window:
+
+```sh
+tmux display-message -p '#{pane_current_command} | #{pane_title}'
+```
+
+The title should look like `agents 1/3 !0 ~1793903991`: busy and total
+agents, unread bells, and the time. The command should
+match `@agent-status-relay-command-pattern` (`ssh`, `mosh-client`, or `et` by
+default). A wrapper such as `autossh` needs adding to that pattern. If the
+number after `~` stops advancing, the remote is no longer redrawing its
+status line. That usually means a hung connection, which is what the stale
+icon reports.
+
 ## Known limitations
 
 - Bells belong to windows, not panes. Viewing a window acknowledges its bell,
   and another client viewing the same window can acknowledge it too.
 - Bells do not survive a tmux server restart.
-- Other-session indicators cover one tmux server. A nested or remote tmux
-  does not report into the outer status bar; see
-  [nested tmux](../examples/nested-tmux.md).
+- Other-session indicators cover one tmux server. A remote tmux reports into
+  the local one only with the [relay](../README.md#remote-tmux-over-ssh)
+  turned on, and only while one of its clients is attached through the SSH
+  pane.
 - Custom `status-format` layouts need manual token placement.
 - The compact preset tints a theme's inline tab colors only when they are
   literal colors set before the window index or name.
