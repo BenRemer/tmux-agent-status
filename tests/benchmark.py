@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import statistics
+import subprocess
 import time
 
 from integration import Server
@@ -28,18 +29,30 @@ if args.baseline:
         parser.error("baseline must contain the original inline @agent-* definitions")
 
 
-def cpu_ticks(pid):
+def cpu_seconds(pid):
+    """CPU time used so far by a process: /proc on Linux, ps elsewhere."""
     path = Path(f"/proc/{pid}/stat")
-    if not path.exists():
+    if path.exists():
+        raw = path.read_text()
+        fields = raw[raw.rfind(")") + 2:].split()
+        return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+    try:
+        out = subprocess.run(["ps", "-o", "time=", "-p", str(pid)], capture_output=True,
+                             text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
         return None
-    raw = path.read_text()
-    fields = raw[raw.rfind(")") + 2:].split()
-    return int(fields[11]) + int(fields[12])
+    # [[dd-]hh:]mm:ss.ss
+    days, _, clock = out.rpartition("-")
+    seconds = 0.0
+    for part in clock.split(":"):
+        seconds = seconds * 60 + float(part)
+    return seconds + (int(days) * 86400 if days else 0)
 
 
 results = []
-for count in args.counts:
+for count, bell in [(count, bell) for count in args.counts for bell in ("off", "on")]:
     server = Server()
+    server.tm("set-option", "-g", "@agent-status-completion-bell", bell)
     try:
         panes = [server.agent(f"A:{n + 1}") for n in range(count)]
         client = server.attach("B:0")
@@ -56,7 +69,8 @@ for count in args.counts:
             for pane in panes
         ]
         try:
-            formats = [("plugin", "#{E:@agent-status-other}")]
+            formats = [("plugin" if bell == "off" else "plugin+bell",
+                        "#{E:@agent-status-other}")]
             if definitions:
                 formats.insert(0, ("inline", "#{E:@agent-other-status}"))
             for name, fmt in formats:
@@ -67,7 +81,7 @@ for count in args.counts:
                     assert "⚙" in server.eval("B:0", fmt, client)
                     latencies.append((time.monotonic() - start) * 1000)
                 written_before = int(server.eval("B:0", "#{client_written}", client))
-                ticks_before = cpu_ticks(pid)
+                cpu_before = cpu_seconds(pid)
                 start = time.monotonic()
                 updates = 0
                 while time.monotonic() - start < 2:
@@ -77,7 +91,7 @@ for count in args.counts:
                     updates += len(descriptors)
                     time.sleep(.1)
                 elapsed = time.monotonic() - start
-                ticks_after = cpu_ticks(pid)
+                cpu_after = cpu_seconds(pid)
                 written_after = int(server.eval("B:0", "#{client_written}", client))
                 record = {
                     "agent_panes": count,
@@ -87,8 +101,8 @@ for count in args.counts:
                     "p95_command_ms": round(sorted(latencies)[math.ceil(len(latencies) * .95) - 1], 3),
                     "title_updates": updates,
                     "terminal_bytes": written_after - written_before,
-                    "cpu_percent_one_core": None if ticks_before is None else round(
-                        (ticks_after - ticks_before) / os.sysconf("SC_CLK_TCK") / elapsed * 100, 2),
+                    "cpu_percent_one_core": None if cpu_before is None else round(
+                        (cpu_after - cpu_before) / elapsed * 100, 2),
                 }
                 results.append(record)
                 print(json.dumps(record), flush=True)
