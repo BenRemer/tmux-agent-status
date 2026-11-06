@@ -281,6 +281,29 @@ class Integration(unittest.TestCase):
         time.sleep(.2)
         self.assertEqual("0", self.s.eval(a, bell))
 
+    def test_completion_bell_skips_the_window_being_viewed(self):
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        # Forward bells to the terminal, as bell-action any does by default.
+        self.s.tm("set-option", "-g", "visual-bell", "off")
+        self.s.load()
+        a = self.s.agent()
+        self.s.attach("A:1")
+        output = self.s.clients[-1][3]
+        time.sleep(.3)
+        start = len(output)
+        # Like an agent's startup spinner, in the window you are looking at.
+        self.s.busy(a)
+        self.s.busy(a, False)
+        time.sleep(.4)
+        sent = re.sub(rb"\x1b\][^\x07]*\x07", b"", bytes(output[start:]))
+        self.assertNotIn(b"\x07", sent)
+        self.assertEqual("", self.s.eval(a, "#{@agent-status-internal-title-busy}"))
+        # The same transition in a window you are not viewing still rings.
+        self.s.tm("select-window", "-t", "A:0")
+        self.s.busy(a)
+        self.s.busy(a, False)
+        self.assertEqual("1", self.wait_for(a, "#{window_bell_flag}", "1"))
+
     def test_completion_bell_skips_titles_from_non_agents(self):
         self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
         self.s.load()

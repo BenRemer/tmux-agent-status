@@ -16,6 +16,8 @@ parser.add_argument("--baseline", type=Path,
                     help="optional older config containing inline @agent-* definitions")
 parser.add_argument("--samples", type=int, default=30)
 parser.add_argument("--counts", type=int, nargs="+", default=[1, 10, 40])
+parser.add_argument("--relay", action="store_true",
+                    help="also publish the relay title, as a remote tmux does")
 args = parser.parse_args()
 if args.samples < 1 or any(count < 1 for count in args.counts):
     parser.error("samples and pane counts must be positive")
@@ -53,6 +55,8 @@ results = []
 for count, bell in [(count, bell) for count in args.counts for bell in ("off", "on")]:
     server = Server()
     server.tm("set-option", "-g", "@agent-status-completion-bell", bell)
+    if args.relay:
+        server.tm("set-option", "-g", "@agent-status-relay", "on")
     try:
         panes = [server.agent(f"A:{n + 1}") for n in range(count)]
         client = server.attach("B:0")
@@ -69,8 +73,8 @@ for count, bell in [(count, bell) for count in args.counts for bell in ("off", "
             for pane in panes
         ]
         try:
-            formats = [("plugin" if bell == "off" else "plugin+bell",
-                        "#{E:@agent-status-other}")]
+            name = "plugin" if bell == "off" else "plugin+bell"
+            formats = [(name + ("+relay" if args.relay else ""), "#{E:@agent-status-other}")]
             if definitions:
                 formats.insert(0, ("inline", "#{E:@agent-other-status}"))
             for name, fmt in formats:

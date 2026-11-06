@@ -49,12 +49,15 @@ async function notifyCompletion($, target) {
 
 async function ringPaneBell($, target) {
   try {
-    const tty = await $.process.run([
+    // The pane's tty, and whether someone is viewing its window: there tmux
+    // sets no unread marker and would only flash the terminal.
+    const info = await $.process.run([
       'tmux', '-S', target.socket,
-      'display-message', '-p', '-t', target.pane, '#{pane_tty}',
+      'display-message', '-p', '-t', target.pane,
+      '#{&&:#{window_active},#{session_attached}} #{pane_tty}',
     ]);
-    const path = tty.exitCode === 0 ? tty.stdout.trim() : '';
-    if (!/^\/dev\/[A-Za-z0-9/._-]+$/.test(path)) return;
+    const [viewed, path = ''] = info.exitCode === 0 ? info.stdout.trim().split(' ') : [];
+    if (viewed !== '0' || !/^\/dev\/[A-Za-z0-9/._-]+$/.test(path)) return;
     // Writing BEL to the pane's terminal is what an application ringing the
     // bell does; tmux sets the window's bell flag from it.
     await $.process.run(['sh', '-c', 'printf "\\a" > "$1"', 'sh', path]);

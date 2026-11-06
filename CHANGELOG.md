@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The completion bell, and the Claude adapter's fallback bell, no longer ring
+  for the window you are viewing. tmux passed those bells straight to the
+  terminal, so starting Codex flashed the screen with a visual bell.
 - Remote tmux over SSH: set `@agent-status-relay on` on the remote, and the
   local SSH tab shows the whole remote tmux like a local agent tab: the cog
   while any remote agent is busy, the bell while any remote window has an

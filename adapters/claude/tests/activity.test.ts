@@ -108,12 +108,12 @@ test('a refused notification does not prevent turn completion', async ($, on) =>
   expect(completions).toBe(1)
 })
 
-function bellSetup(on, notifyResult) {
+function bellSetup(on, notifyResult, viewed = false) {
   const commands = []
   mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
   on('process.run', ($, e) => {
     commands.push(e.argv)
-    const stdout = e.argv.includes('display-message') ? '/dev/ttys004\n' : ''
+    const stdout = e.argv.includes('display-message') ? `${viewed ? 1 : 0} /dev/ttys004\n` : ''
     return { value: { exitCode: 0, stdout, stderr: '' } }
   })
   on('ui.notify', () => ({ value: notifyResult }))
@@ -137,7 +137,8 @@ test('without a bell channel, completion rings the pane bell itself', async ($, 
   const commands = bellSetup(on, { isSent: false, reason: 'no-channel' })
   await completeOneTurn($)
   expect(commands.slice(3)).toEqual([
-    ['tmux', '-S', '/tmp/socket', 'display-message', '-p', '-t', '%42', '#{pane_tty}'],
+    ['tmux', '-S', '/tmp/socket', 'display-message', '-p', '-t', '%42',
+      '#{&&:#{window_active},#{session_attached}} #{pane_tty}'],
     bellWrite,
   ])
 })
@@ -146,6 +147,13 @@ test('a desktop-notification channel still gets a tmux bell', async ($, on) => {
   const commands = bellSetup(on, { isSent: true, channel: 'kitty' })
   await completeOneTurn($)
   expect(commands[commands.length - 1]).toEqual(bellWrite)
+})
+
+test('the window being viewed gets no fallback bell', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'no-channel' }, true)
+  await completeOneTurn($)
+  expect(commands.length).toBe(4)
+  expect(commands[3][3]).toBe('display-message')
 })
 
 test('a terminal_bell channel is not rung twice', async ($, on) => {

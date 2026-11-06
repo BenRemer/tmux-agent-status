@@ -216,11 +216,13 @@ fi
 
 # Ring the pane's bell when a busy agent title turns idle, so title-reporting
 # agents (Codex, agy) need no notification setup. tmux commands only; the
-# shell runs once per completed turn, never per title frame. The marker is set
+# shell runs once per completed turn, never per title frame. It does not ring
+# for the window you are viewing: tmux would only pass the bell on to the
+# terminal, such as an agent's startup spinner flashing the screen. The marker is set
 # only once per turn: setting an option redraws every client. A marker left by
 # an agent that exited is cleared without ringing.
 if [ "$agent_completion_bell" = on ]; then
-    agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{&&:#{@agent-status-internal-busy-pattern},#{m/r:#{@agent-status-internal-busy-pattern},#{pane_title}}}' { if-shell -F '#{?#{@agent-status-internal-title-busy},0,#{E:@agent-status-internal-pane}}' 'set-option -p @agent-status-internal-title-busy 1' } { if-shell -F '#{@agent-status-internal-title-busy}' { set-option -pu @agent-status-internal-title-busy ; if-shell -F '#{E:@agent-status-internal-pane}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } } }"
+    agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{&&:#{@agent-status-internal-busy-pattern},#{m/r:#{@agent-status-internal-busy-pattern},#{pane_title}}}' { if-shell -F '#{?#{@agent-status-internal-title-busy},0,#{E:@agent-status-internal-pane}}' 'set-option -p @agent-status-internal-title-busy 1' } { if-shell -F '#{@agent-status-internal-title-busy}' { set-option -pu @agent-status-internal-title-busy ; if-shell -F '#{&&:#{E:@agent-status-internal-pane},#{==:#{&&:#{window_active},#{session_attached}},0}}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } } }"
 else
     agent_tmux set-hook -gu "$agent_hook"
 fi
