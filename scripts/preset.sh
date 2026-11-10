@@ -215,8 +215,31 @@ agent_place_icon() {
     printf '%s' "$agent_head$agent_icon$agent_pad$agent_tail"
 }
 
+# The compact preset takes prefix + s and prefix + w only while they are
+# tmux's stock choose-tree bindings, and gives them back for preset none.
+agent_apply_tree_keys() {
+    for agent_key in s w; do
+        # Some tmux versions list nothing for a single key, so read the table.
+        agent_binding=$(agent_tmux list-keys -T prefix 2>/dev/null |
+            sed -n "s/^bind-key  *-T prefix  *$agent_key  *//p")
+        case "$agent_binding" in
+            *@agent-status-internal-tree-format*) agent_ours=1 ;;
+            "choose-tree -Z$agent_key") agent_ours=0 ;;
+            *) continue ;;
+        esac
+        if [ "$1" = compact ]; then
+            [ "$agent_ours" = 1 ] ||
+                agent_tmux bind-key -T prefix "$agent_key" choose-tree "-Z$agent_key" \
+                    -F '#{E:@agent-status-internal-tree-format}'
+        elif [ "$agent_ours" = 1 ]; then
+            agent_tmux bind-key -T prefix "$agent_key" choose-tree "-Z$agent_key"
+        fi
+    done
+}
+
 agent_apply_preset() {
     agent_preset_mode=$1
+    agent_apply_tree_keys "$agent_preset_mode"
     agent_open='#{E:@agent-status-internal-preset-window-open}'
     agent_close='#{E:@agent-status-internal-preset-window-close}'
     agent_icon='#{E:@agent-status-internal-preset-window-icon}'
@@ -263,11 +286,28 @@ agent_apply_preset() {
                 ;;
         esac
         agent_new=$agent_clean
+        if [ "$agent_option" = status-right ]; then
+            # The length the plugin added for its corner, unless something
+            # else has set status-right-length since.
+            agent_length=$(agent_tmux show-options -gv status-right-length)
+            agent_right_added=0
+            if [ "$agent_length" = "$(agent_tmux show-options -gqv @agent-status-internal-right-length-set)" ]; then
+                agent_right_added=$(agent_tmux show-options -gqv @agent-status-internal-right-length-added)
+                case "$agent_right_added" in ''|*[!0-9]*) agent_right_added=0 ;; esac
+            fi
+            agent_right_width=0
+        fi
         if [ "$agent_preset_mode" = compact ]; then
             if [ "$agent_option" = status-right ]; then
                 case "$agent_new" in
                     *'#{E:@agent-status-other}'*|*'#{T:@agent-status-other}'*) ;;
-                    *) agent_new=$agent_new$agent_other ;;
+                    *)
+                        agent_new=$agent_new$agent_other
+                        # Room for every indicator, each its icon plus two spaces.
+                        agent_right_width=$(agent_tmux display-message -p \
+                            '#{e|+:#{e|+:#{w:@agent-status-internal-running-icon},#{w:@agent-status-internal-stale-icon}},#{e|+:#{w:@agent-status-internal-bell-icon},6}}')
+                        case "$agent_right_width" in ''|*[!0-9]*) agent_right_width=9 ;; esac
+                        ;;
                 esac
             else
                 case "$agent_new" in
@@ -279,6 +319,23 @@ agent_apply_preset() {
         fi
         if [ "$agent_new" != "$agent_original" ]; then
             agent_tmux set-option -g "$agent_option" "$agent_new"
+        fi
+        # Widen status-right by the appended corner, so tmux does not clip it
+        # at status-right-length, and give the width back when it goes.
+        if [ "$agent_option" = status-right ]; then
+            agent_length=$((agent_length - agent_right_added))
+            [ "$agent_length" -ge 0 ] || agent_length=0
+            agent_length=$((agent_length + agent_right_width))
+            if [ "$agent_right_width" != "$agent_right_added" ]; then
+                agent_tmux set-option -g status-right-length "$agent_length"
+            fi
+            if [ "$agent_right_width" -gt 0 ]; then
+                agent_tmux set-option -g @agent-status-internal-right-length-added "$agent_right_width"
+                agent_tmux set-option -g @agent-status-internal-right-length-set "$agent_length"
+            else
+                agent_tmux set-option -gu @agent-status-internal-right-length-added
+                agent_tmux set-option -gu @agent-status-internal-right-length-set
+            fi
         fi
     done
 }

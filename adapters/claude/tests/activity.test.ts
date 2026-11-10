@@ -108,12 +108,12 @@ test('a refused notification does not prevent turn completion', async ($, on) =>
   expect(completions).toBe(1)
 })
 
-function bellSetup(on, notifyResult, viewed = false) {
+function bellSetup(on, notifyResult, viewed = false, seconds = '10') {
   const commands = []
   mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
   on('process.run', ($, e) => {
     commands.push(e.argv)
-    const stdout = e.argv.includes('display-message') ? `${viewed ? 1 : 0} /dev/ttys004\n` : ''
+    const stdout = e.argv.includes('display-message') ? `${viewed ? 1 : 0} ${seconds} /dev/ttys004\n` : ''
     return { value: { exitCode: 0, stdout, stderr: '' } }
   })
   on('ui.notify', () => ({ value: notifyResult }))
@@ -123,10 +123,10 @@ function bellSetup(on, notifyResult, viewed = false) {
   return commands
 }
 
-async function completeOneTurn($) {
+async function completeOneTurn($, durationMs = 1) {
   await $.session.start(terminal)
   await $.turn.start({ turnId: 'main' })
-  await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs: 1 })
+  await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs })
   // The notification runs after completion returns; let it finish.
   for (let i = 0; i < 20; i += 1) await Promise.resolve()
 }
@@ -138,7 +138,7 @@ test('without a bell channel, completion rings the pane bell itself', async ($, 
   await completeOneTurn($)
   expect(commands.slice(3)).toEqual([
     ['tmux', '-S', '/tmp/socket', 'display-message', '-p', '-t', '%42',
-      '#{&&:#{window_active},#{session_attached}} #{pane_tty}'],
+      '#{&&:#{window_active},#{session_attached}} #{@agent-status-internal-viewed-bell-seconds} #{pane_tty}'],
     bellWrite,
   ])
 })
@@ -149,11 +149,29 @@ test('a desktop-notification channel still gets a tmux bell', async ($, on) => {
   expect(commands[commands.length - 1]).toEqual(bellWrite)
 })
 
-test('the window being viewed gets no fallback bell', async ($, on) => {
+test('the window being viewed gets no fallback bell for a short turn', async ($, on) => {
   const commands = bellSetup(on, { isSent: false, reason: 'no-channel' }, true)
-  await completeOneTurn($)
+  await completeOneTurn($, 9999)
   expect(commands.length).toBe(4)
   expect(commands[3][3]).toBe('display-message')
+})
+
+test('the window being viewed rings after a long turn, for an outer tmux', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'no-channel' }, true)
+  await completeOneTurn($, 10000)
+  expect(commands[commands.length - 1]).toEqual(bellWrite)
+})
+
+test('the viewed-window threshold comes from the plugin, with a default', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'no-channel' }, true, '2')
+  await completeOneTurn($, 2000)
+  expect(commands[commands.length - 1]).toEqual(bellWrite)
+})
+
+test('without the plugin loaded, the viewed-window threshold defaults to 10 seconds', async ($, on) => {
+  const commands = bellSetup(on, { isSent: false, reason: 'no-channel' }, true, '')
+  await completeOneTurn($, 9999)
+  expect(commands.length).toBe(4)
 })
 
 test('a terminal_bell channel is not rung twice', async ($, on) => {

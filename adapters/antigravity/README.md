@@ -15,16 +15,15 @@ Requires Python 3 and an Antigravity version with custom title support.
 
 ## Install
 
-Merge this into `~/.gemini/antigravity-cli/settings.json` on the machine
-**running agy**:
+On the machine **running agy**, add this top-level `title` key to
+`~/.gemini/antigravity-cli/settings.json`, alongside your other settings
+(wrap it in `{ }` if the file is new):
 
 ```json
-{
-  "title": {
-    "type": "command",
-    "command": "python3 \"$HOME/.tmux/plugins/tmux-agent-status/adapters/antigravity/title.py\"",
-    "enabled": true
-  }
+"title": {
+  "type": "command",
+  "command": "python3 \"$HOME/.tmux/plugins/tmux-agent-status/adapters/antigravity/title.py\"",
+  "enabled": true
 }
 ```
 

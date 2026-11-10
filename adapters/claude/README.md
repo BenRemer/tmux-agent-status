@@ -45,17 +45,18 @@ configured channel. Then it acts on the result:
 
 The fallback covers turn completion only. Claude's own notifications, such as
 permission prompts and idle input, reach tmux only through a BEL-writing
-channel. To get those too, set this in `~/.claude/settings.json`, or pick
-**Terminal Bell** for the notifications row in `/config`:
+channel. To get those too, run `/config` in Claude and set **Notifications**
+to **Terminal Bell**, or add this top-level key to `~/.claude/settings.json`
+alongside your other settings (wrap it in `{ }` if the file is new):
 
 ```json
-{
-  "preferredNotifChannel": "terminal_bell"
-}
+"preferredNotifChannel": "terminal_bell"
 ```
 
-A completion bell creates an unread marker only if the notified window is not
-currently being viewed. The marker also appears in other sessions' corner
+The fallback bell rings in the window you are viewing only after a turn of at
+least 10 seconds, the same rule as the plugin's completion bell. A completion
+bell creates an unread marker only if the notified window is not currently
+being viewed. The marker also appears in other sessions' corner
 indicators.
 
 The adapter runs one `tmux` command per activity change, plus two (read the

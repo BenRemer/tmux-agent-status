@@ -128,12 +128,22 @@ This plugin does not preserve unread notifications across tmux server restarts.
 ## The corner is missing or clipped
 
 Verify that `status-right` contains `#{E:@agent-status-other}` or that the
-compact preset loaded successfully. Increase `status-right-length` if other
-status content leaves too little room. The plugin leaves your width choices
-unchanged.
+compact preset loaded successfully. When the compact preset adds the corner
+to `status-right`, it raises `status-right-length` by the corner's width, and
+gives that width back with preset `none` or `--uninstall`. If you placed
+`#{E:@agent-status-other}` yourself, increase `status-right-length` if other
+status content leaves too little room.
 
 If the theme replaced your formats after the plugin loaded, load the plugin
 after the theme. Use manual tokens for a custom `status-format`.
+
+## The whole status line blinks or briefly goes blank
+
+tmux 3.8 stops expanding a format that runs past its time limit, and draws
+what it has so far, often nothing. Time your status line:
+`time tmux display -p '#{E:status-format[0]}'` should take a few milliseconds
+plus the cost of starting tmux. If it takes much longer, remove status
+content one piece at a time to find the slow part.
 
 ## There is a large yellow message or a border around the whole terminal
 

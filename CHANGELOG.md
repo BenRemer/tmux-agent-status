@@ -2,9 +2,18 @@
 
 ## Unreleased
 
-- The completion bell, and the Claude adapter's fallback bell, no longer ring
-  for the window you are viewing. tmux passed those bells straight to the
-  terminal, so starting Codex flashed the screen with a visual bell.
+- The completion bell, and the Claude adapter's fallback bell, ring for the
+  window you are viewing only after a turn of at least 10 seconds. tmux passes
+  those bells straight to the terminal, so starting Codex flashed the screen
+  with a visual bell; skipping the viewed window entirely meant an outer tmux
+  showing another tab never heard about a finished Codex turn.
+- The compact preset adds session and window indicators to the prefix + s
+  and prefix + w trees while those keys are tmux's stock `choose-tree`
+  bindings. Customized bindings are left alone; preset `none` and
+  `--uninstall` restore the stock ones.
+- The compact preset raises `status-right-length` by the corner's width when
+  it appends the corner, so a full `status-right` no longer clips the corner
+  to a bare colored space. Preset `none` and `--uninstall` give the width back.
 - Remote tmux over SSH: set `@agent-status-relay on` on the remote, and the
   local SSH tab shows the whole remote tmux like a local agent tab: the cog
   while any remote agent is busy, the bell while any remote window has an

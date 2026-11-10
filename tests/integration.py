@@ -130,16 +130,22 @@ class Server:
             raise AssertionError(f"tmux {args}: {r.stderr}")
         return r.stdout.strip()
 
-    def load(self, mode=None, check=True, via_tmux=False):
+    def load(self, mode=None, check=True, via_tmux=False, real_clock=False):
         if mode is not None:
             self.tm("set-option", "-g", "@agent-status-preset", mode)
         if via_tmux:
             # Exercise the actual manual/TPM run-shell path and TMUX socket parsing.
-            return self.tm("run-shell", shlex.quote(str(ROOT / "agent-status.tmux")))
-        r = subprocess.run([str(ROOT / "agent-status.tmux"), "--socket", self.socket],
-                           env=self.env, capture_output=True, text=True, timeout=10)
-        if check and r.returncode:
-            raise AssertionError(r.stderr)
+            r = self.tm("run-shell", shlex.quote(str(ROOT / "agent-status.tmux")))
+        else:
+            r = subprocess.run([str(ROOT / "agent-status.tmux"), "--socket", self.socket],
+                               env=self.env, capture_output=True, text=True, timeout=10)
+            if check and r.returncode:
+                raise AssertionError(r.stderr)
+        if not real_clock:
+            # The relay clock is a #() job, and display-message never runs
+            # jobs. Formats evaluated here read the time directly instead.
+            self.tm("set-option", "-g", "@agent-status-internal-clock",
+                    "#{T:@agent-status-internal-now}")
         return r
 
     def attach(self, target):
@@ -270,7 +276,8 @@ class Integration(unittest.TestCase):
         self.s.emit(a, "\x1b]2;⠙ Working\x07")
         time.sleep(.2)
         self.assertEqual("0", self.s.eval(a, bell))
-        self.assertEqual("1", self.s.eval(a, "#{@agent-status-internal-title-busy}"))
+        # The marker records when the turn started.
+        self.assertRegex(self.s.eval(a, "#{@agent-status-internal-title-busy}"), r"^[0-9]{10,}$")
         self.s.busy(a, False)
         self.assertEqual("1", self.wait_for(a, bell, "1"))
         self.assertEqual("", self.s.eval(a, "#{@agent-status-internal-title-busy}"))
@@ -303,6 +310,25 @@ class Integration(unittest.TestCase):
         self.s.busy(a)
         self.s.busy(a, False)
         self.assertEqual("1", self.wait_for(a, "#{window_bell_flag}", "1"))
+
+    def test_completion_bell_rings_the_viewed_window_after_a_long_turn(self):
+        # Nested in an outer tmux, the window this server shows may not be the
+        # one you are looking at; tmux passes a real turn's bell on to it.
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.tm("set-option", "-g", "visual-bell", "off")
+        self.s.load()
+        self.s.tm("set-option", "-g", "@agent-status-internal-viewed-bell-seconds", "1")
+        a = self.s.agent()
+        self.s.attach("A:1")
+        output = self.s.clients[-1][3]
+        time.sleep(.3)
+        start = len(output)
+        self.s.busy(a)
+        time.sleep(1.2)
+        self.s.busy(a, False)
+        time.sleep(.4)
+        sent = re.sub(rb"\x1b\][^\x07]*\x07", b"", bytes(output[start:]))
+        self.assertIn(b"\x07", sent)
 
     def test_completion_bell_skips_titles_from_non_agents(self):
         self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
@@ -421,6 +447,19 @@ class Integration(unittest.TestCase):
         self.assertIn(STALE, corner)
         self.assertIn(BELL, corner)
         self.assertLess(corner.index(STALE), corner.index(BELL))
+
+    def test_relay_clock_job_renders_in_the_status_line(self):
+        self.s.load(real_clock=True)
+        self.s.tm("set-option", "-g", "status-right", "[#{E:@agent-status-internal-clock}]")
+        self.s.attach("A:0")
+        output = self.s.clients[-1][3]
+        for _ in range(60):
+            found = re.findall(rb"\[([0-9]{10,})\]", bytes(output))
+            if found:
+                break
+            time.sleep(.1)
+        self.assertTrue(found, bytes(output)[-300:])
+        self.assertLess(abs(int(found[-1]) - time.time()), 5)
 
     def test_relay_title_is_ignored_outside_ssh(self):
         a = self.s.agent()  # codex, not ssh
@@ -916,6 +955,54 @@ class Integration(unittest.TestCase):
         self.assertEqual({b"HEAD", b"TAIL"}, set(labels), repr(data))
         self.assertEqual(labels[b"HEAD"], labels[b"TAIL"])
         self.assertEqual(46, labels[b"TAIL"]["fg"])
+
+    def test_compact_widens_status_right_for_the_corner(self):
+        self.s.tm("set-option", "-g", "status-right", "x" * 39)
+        self.s.tm("set-option", "-g", "status-right-length", "40")
+        length = lambda: self.s.tm("show-options", "-gv", "status-right-length")
+        self.s.load("compact")
+        self.assertEqual("49", length())
+        # Reloading the plugin does not widen it again.
+        self.s.load()
+        self.assertEqual("49", length())
+        # A config reload that resets status-right but not its length.
+        self.s.tm("set-option", "-g", "status-right", "x" * 39)
+        self.s.load()
+        self.assertEqual("49", length())
+        # A config that sets its own length starts from that.
+        self.s.tm("set-option", "-g", "status-right-length", "60")
+        self.s.load()
+        self.assertEqual("69", length())
+        self.s.load("none")
+        self.assertEqual("60", length())
+        self.s.load("compact")
+        self.s.tm("run-shell", shlex.quote(str(ROOT / "agent-status.tmux")) + " --uninstall")
+        self.assertEqual("60", length())
+        # The bell indicator fits after a full status-right.
+        self.s.tm("set-option", "-g", "status-right-length", "40")
+        self.s.load("compact")
+        a = self.s.agent()
+        c = self.s.attach("B:0")
+        self.s.emit(a, "\a")
+        clipped = self.s.eval("B:0", "#{T;=/#{status-right-length}:status-right}", c)
+        self.assertIn(BELL, clipped)
+
+    def test_compact_takes_only_stock_tree_keys(self):
+        keys = lambda k: self.s.tm("list-keys", "-T", "prefix", k)
+        self.s.tm("bind-key", "-T", "prefix", "w", "choose-tree", "-Zw", "-O", "name")
+        self.s.load("compact")
+        self.assertIn("@agent-status-internal-tree-format", keys("s"))
+        self.assertIn("-O name", keys("w"))
+        a = self.s.agent()
+        self.s.emit(a, "\a")
+        tree = "#{E:@agent-status-internal-tree-format}"
+        sessions = dict(line.split(" ", 1) for line in self.s.tm(
+            "list-sessions", "-F", f"#{{session_name}} {tree}").splitlines())
+        self.assertTrue(sessions["A"].endswith(BELL), sessions)
+        self.assertNotIn(BELL, sessions["B"])
+        self.s.load("none")
+        self.assertTrue(keys("s").endswith("choose-tree -Zs"), keys("s"))
+        self.assertIn("-O name", keys("w"))
 
     def test_linked_window_bell_acknowledged_by_another_client(self):
         a = self.s.agent()

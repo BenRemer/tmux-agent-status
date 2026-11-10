@@ -95,9 +95,10 @@ Nothing to set up. Codex's default terminal title includes `activity`, and the
 plugin uses its busy spinner for both the running cog and the completion bell.
 If you customize Codex's title items, keep `activity`.
 
-You no longer need Codex's own `notification_method = "bel"`. If you already
-set it, Codex and the plugin may both ring at the end of a turn. Turn off one
-of them: remove the Codex setting, or set `@agent-status-completion-bell off`.
+Codex has its own bell setting, `notification_method = "bel"` under `[tui]`
+in `~/.codex/config.toml`. You don't need it with this plugin. If you have it
+set, both may ring at the end of a turn; remove that line, or set
+`@agent-status-completion-bell off` to keep only Codex's bell.
 
 ### Claude Code
 
@@ -122,13 +123,12 @@ main turn finishes. Cancellation and subagent completion do not ring. It does
 nothing outside an interactive tmux session.
 
 **2. Recommended: set Claude's notification channel to the terminal bell.**
-Merge this into `~/.claude/settings.json`, or pick **Terminal Bell** for the
-notifications row in `/config`:
+In Claude, run `/config` and set **Notifications** to **Terminal Bell**. Or
+add this top-level key to `~/.claude/settings.json`, alongside your other
+settings (if the file doesn't exist yet, wrap it in `{ }`):
 
 ```json
-{
-  "preferredNotifChannel": "terminal_bell"
-}
+"preferredNotifChannel": "terminal_bell"
 ```
 
 This setting decides how the bell reaches tmux:
@@ -175,8 +175,10 @@ agent rings itself work independently of agent recognition.
 
 When a recognized agent's title changes from busy (a spinner) to idle, the
 plugin rings that pane's bell. It is a normal tmux bell, so it marks the tab
-and the corner indicator like any other. It does not ring while you are
-viewing the window. A new spinner frame never rings, and a shell's title
+and the corner indicator like any other. In the window you are viewing, it
+rings only after a turn of at least 10 seconds, so an agent's startup spinner
+doesn't flash the screen. A longer turn still rings there, because inside an
+outer tmux the outer one may be showing another tab. A new spinner frame never rings, and a shell's title
 change after the agent exits doesn't either. tmux runs a shell command only
 once per finished turn, not for every title change.
 
@@ -233,8 +235,12 @@ set -g @agent-status-preset 'compact'
 ```
 
 It decorates your window formats and appends other-session indicators to
-`status-right`. It preserves names, theme styling, key bindings, and existing
-status content. Repeated loads do not duplicate its additions.
+`status-right`, widening `status-right-length` to fit them. While prefix + s
+and prefix + w are still tmux's stock `choose-tree` bindings, it adds the
+session and window indicators to that tree; bindings you changed are left
+alone. It preserves names, theme styling, and existing status content.
+Repeated loads do not duplicate its additions, and preset `none` or
+`--uninstall` undoes them.
 
 The preset supports tmux's standard status layout. For a custom
 `status-format`, use manual placement.

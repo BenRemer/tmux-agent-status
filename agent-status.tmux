@@ -216,13 +216,15 @@ fi
 
 # Ring the pane's bell when a busy agent title turns idle, so title-reporting
 # agents (Codex, agy) need no notification setup. tmux commands only; the
-# shell runs once per completed turn, never per title frame. It does not ring
-# for the window you are viewing: tmux would only pass the bell on to the
-# terminal, such as an agent's startup spinner flashing the screen. The marker is set
-# only once per turn: setting an option redraws every client. A marker left by
-# an agent that exited is cleared without ringing.
+# shell runs once per completed turn, never per title frame. The marker holds
+# the turn's start time and is set only once per turn: setting an option
+# redraws every client. In the window you are viewing, only a turn of at least
+# @agent-status-internal-viewed-bell-seconds rings, so a startup spinner does
+# not flash the screen; a real turn still rings, and tmux passes that bell on
+# to an outer tmux, which may be showing another tab. A marker left by an
+# agent that exited is cleared without ringing.
 if [ "$agent_completion_bell" = on ]; then
-    agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{&&:#{@agent-status-internal-busy-pattern},#{m/r:#{@agent-status-internal-busy-pattern},#{pane_title}}}' { if-shell -F '#{?#{@agent-status-internal-title-busy},0,#{E:@agent-status-internal-pane}}' 'set-option -p @agent-status-internal-title-busy 1' } { if-shell -F '#{@agent-status-internal-title-busy}' { set-option -pu @agent-status-internal-title-busy ; if-shell -F '#{&&:#{E:@agent-status-internal-pane},#{==:#{&&:#{window_active},#{session_attached}},0}}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } } }"
+    agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{&&:#{@agent-status-internal-busy-pattern},#{m/r:#{@agent-status-internal-busy-pattern},#{pane_title}}}' { if-shell -F '#{?#{@agent-status-internal-title-busy},0,#{E:@agent-status-internal-pane}}' { set-option -pF @agent-status-internal-title-busy '#{T:@agent-status-internal-now}' } } { if-shell -F '#{@agent-status-internal-title-busy}' { if-shell -F '#{E:@agent-status-internal-bell-due}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } ; set-option -pu @agent-status-internal-title-busy } }"
 else
     agent_tmux set-hook -gu "$agent_hook"
 fi

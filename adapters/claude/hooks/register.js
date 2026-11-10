@@ -30,7 +30,7 @@ async function reportActivity($, busy) {
 // Claude's channels that write BEL, which tmux turns into a window bell.
 const BELL_CHANNELS = new Set(['terminal_bell', 'iterm2_with_bell']);
 
-async function notifyCompletion($, target) {
+async function notifyCompletion($, target, elapsedMs) {
   let result;
   try {
     result = await $.ui.notify('Task complete');
@@ -44,20 +44,27 @@ async function notifyCompletion($, target) {
   // (iterm2, kitty, ghostty) do not set tmux's bell flag.
   if (!result || BELL_CHANNELS.has(result.channel)) return;
   if (!result.isSent && result.reason !== 'no-channel') return;
-  await ringPaneBell($, target);
+  await ringPaneBell($, target, elapsedMs);
 }
 
-async function ringPaneBell($, target) {
+const DEFAULT_VIEWED_BELL_SECONDS = 10;
+
+async function ringPaneBell($, target, elapsedMs) {
   try {
-    // The pane's tty, and whether someone is viewing its window: there tmux
-    // sets no unread marker and would only flash the terminal.
+    // The pane's tty, and whether someone is viewing its window. There tmux
+    // sets no unread marker, so like the plugin's completion bell, only a turn
+    // long enough to matter rings: tmux passes that bell on to an outer tmux,
+    // which may be showing another tab.
     const info = await $.process.run([
       'tmux', '-S', target.socket,
       'display-message', '-p', '-t', target.pane,
-      '#{&&:#{window_active},#{session_attached}} #{pane_tty}',
+      '#{&&:#{window_active},#{session_attached}} #{@agent-status-internal-viewed-bell-seconds} #{pane_tty}',
     ]);
-    const [viewed, path = ''] = info.exitCode === 0 ? info.stdout.trim().split(' ') : [];
-    if (viewed !== '0' || !/^\/dev\/[A-Za-z0-9/._-]+$/.test(path)) return;
+    const [viewed, seconds = '', path = ''] =
+      info.exitCode === 0 ? info.stdout.trim().split(' ') : [];
+    const minimum = /^[0-9]+$/.test(seconds) ? Number(seconds) : DEFAULT_VIEWED_BELL_SECONDS;
+    if (viewed !== '0' && !(viewed === '1' && elapsedMs >= minimum * 1000)) return;
+    if (!/^\/dev\/[A-Za-z0-9/._-]+$/.test(path)) return;
     // Writing BEL to the pane's terminal is what an application ringing the
     // bell does; tmux sets the window's bell flag from it.
     await $.process.run(['sh', '-c', 'printf "\\a" > "$1"', 'sh', path]);
@@ -90,7 +97,7 @@ export function register(on) {
       if (connection && wasActive && activeTurns.size === 0 && !e.isAborted) {
         // Never delay completion for a notification, and never notify for
         // cancellation or child turns.
-        notifyCompletion($, connection).catch(() => {});
+        notifyCompletion($, connection, e.durationMs).catch(() => {});
       }
     }
     return next(e);

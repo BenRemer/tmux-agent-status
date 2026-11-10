@@ -8,7 +8,10 @@ them. The plugin resolves defaults without overwriting your input options.
 `@agent-status-preset` is `none` by default. Set it to `compact` for automatic
 placement. The compact preset decorates the existing global
 `window-status-format`, `window-status-current-format`, and `status-right`.
-It does not replace the whole theme or change key bindings.
+It does not replace the whole theme. The only key bindings it changes are
+prefix + s and prefix + w, and only while they are tmux's stock
+`choose-tree` bindings: it adds the session and window indicators to the
+tree, and restores the stock bindings with preset `none` or `--uninstall`.
 
 Themes that draw tabs with inline colors, such as powerline layouts, would
 hide a wrapping accent. For these, the preset reads the literal `bg=`/`fg=`
