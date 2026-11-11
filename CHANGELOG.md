@@ -7,7 +7,8 @@
   only if it ends at least `@agent-status-followup-bell-seconds` (default 30)
   after the previous turn.
 - The completion bell, and the Claude adapter's fallback bell, ring for the
-  window you are viewing only after a turn of at least 10 seconds. tmux passes
+  window you are viewing only after a turn of at least
+  `@agent-status-viewed-bell-seconds` (default 10; `0` always rings). tmux passes
   those bells straight to the terminal, so starting Codex flashed the screen
   with a visual bell; skipping the viewed window entirely meant an outer tmux
   showing another tab never heard about a finished Codex turn.

@@ -61,7 +61,8 @@ still notifies when it's done. Set it to `0` to notify for every follow-up.
 Turns that start from a prompt you type always notify.
 
 The fallback bell rings in the window you are viewing only after a turn of at
-least 10 seconds, the same rule as the plugin's completion bell. A completion
+least `@agent-status-viewed-bell-seconds` (default 10), the same rule as the
+plugin's completion bell. A completion
 bell creates an unread marker only if the notified window is not currently
 being viewed. The marker also appears in other sessions' corner
 indicators.

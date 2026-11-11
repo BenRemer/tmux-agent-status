@@ -145,9 +145,13 @@ esac
 # Claude adapter: a follow-up turn a finished background task starts rings
 # only if it ends at least this many seconds after the previous turn.
 agent_followup_seconds=$(agent_input @agent-status-followup-bell-seconds 30)
-case "$agent_followup_seconds" in
-    ''|*[!0-9]*) agent_warn '@agent-status-followup-bell-seconds must be a whole number of seconds'; exit 1 ;;
-esac
+# In the window tmux is showing, only a turn at least this long rings.
+agent_viewed_seconds=$(agent_input @agent-status-viewed-bell-seconds 10)
+for agent_value in "$agent_followup_seconds" "$agent_viewed_seconds"; do
+    case "$agent_value" in
+        ''|*[!0-9]*) agent_warn '@agent-status-followup-bell-seconds and @agent-status-viewed-bell-seconds must be whole numbers of seconds'; exit 1 ;;
+    esac
+done
 agent_relay=$(agent_input @agent-status-relay off)
 agent_relay_count=$(agent_input @agent-status-relay-count off)
 for agent_value in "$agent_relay" "$agent_relay_count"; do
@@ -197,6 +201,7 @@ agent_style_color() {
 
 # Resolved defaults never overwrite user input options.
 agent_tmux set-option -g @agent-status-internal-followup-bell-seconds "$agent_followup_seconds"
+agent_tmux set-option -g @agent-status-internal-viewed-bell-seconds "$agent_viewed_seconds"
 agent_tmux set-option -g @agent-status-internal-running-icon "$agent_running_icon"
 agent_tmux set-option -g @agent-status-internal-bell-icon "$agent_bell_icon"
 agent_tmux set-option -g @agent-status-internal-stale-icon "$agent_stale_icon"
@@ -226,7 +231,7 @@ fi
 # shell runs once per completed turn, never per title frame. The marker holds
 # the turn's start time and is set only once per turn: setting an option
 # redraws every client. In the window you are viewing, only a turn of at least
-# @agent-status-internal-viewed-bell-seconds rings, so a startup spinner does
+# @agent-status-viewed-bell-seconds (default 10) rings, so a startup spinner does
 # not flash the screen; a real turn still rings, and tmux passes that bell on
 # to an outer tmux, which may be showing another tab. A marker left by an
 # agent that exited is cleared without ringing.

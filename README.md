@@ -7,7 +7,7 @@ working in another session, and come back when a tab has something for you.
 
 [![Tests](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml/badge.svg)](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Beta](https://img.shields.io/badge/release-0.1.0--beta.2-d29922.svg)](CHANGELOG.md)
+[![Beta](https://img.shields.io/badge/release-beta-d29922.svg)](CHANGELOG.md)
 
 ![A selected shell tab, softly highlighted working agent tabs, an amber notification tab, and indicators for other sessions](docs/images/overview.png)
 
@@ -58,8 +58,7 @@ Then [set up your agent](#set-up-your-agent). Do not also add a manual
 ### Without TPM
 
 ```sh
-git clone --branch v0.1.0-beta.2 \
-  https://github.com/benremer/tmux-agent-status.git \
+git clone https://github.com/benremer/tmux-agent-status.git \
   ~/.tmux/plugins/tmux-agent-status
 ```
 
@@ -176,9 +175,10 @@ agent rings itself work independently of agent recognition.
 When a recognized agent's title changes from busy (a spinner) to idle, the
 plugin rings that pane's bell. It is a normal tmux bell, so it marks the tab
 and the corner indicator like any other. In the window you are viewing, it
-rings only after a turn of at least 10 seconds, so an agent's startup spinner
-doesn't flash the screen. A longer turn still rings there, because inside an
-outer tmux the outer one may be showing another tab. A new spinner frame never rings, and a shell's title
+rings only after a turn of at least 10 seconds
+(`@agent-status-viewed-bell-seconds`), so an agent's startup spinner doesn't
+flash the screen. A longer turn still rings there, because inside an outer
+tmux the outer one may be showing another tab. A new spinner frame never rings, and a shell's title
 change after the agent exits doesn't either. tmux runs a shell command only
 once per finished turn, not for every title change.
 
@@ -310,6 +310,7 @@ Set options before the plugin loads, then reload to apply them.
 | `@agent-status-running-style` | Inherit in manual mode; soft teal in compact mode |
 | `@agent-status-bell-style` | Inherit in manual mode; amber in compact mode |
 | `@agent-status-completion-bell` | `on`; rings a tab's bell when its agent's busy title turns idle |
+| `@agent-status-viewed-bell-seconds` | `10`; in the window tmux is showing, an agent's finished turn rings only if it lasted at least this long, so a startup spinner doesn't flash the screen. Lower it when tmux runs nested and the outer tmux may be showing another tab. `0` always rings. |
 | `@agent-status-followup-bell-seconds` | `30`; Claude adapter: a turn Claude starts on its own after a background task finishes rings only if it ends at least this long after the previous turn. `0` always rings. |
 | `@agent-status-stale-icon` | From `@agent-status-icons`: a broken link (U+F127, `nf-fa-chain_broken`), or ⚠ for `emoji` |
 | `@agent-status-stale-style` | Inherit in manual mode; muted red in compact mode |
