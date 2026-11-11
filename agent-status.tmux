@@ -142,6 +142,12 @@ case "$agent_completion_bell" in
     on|off) ;;
     *) agent_warn '@agent-status-completion-bell must be on or off'; exit 1 ;;
 esac
+# Claude adapter: a follow-up turn a finished background task starts rings
+# only if it ends at least this many seconds after the previous turn.
+agent_followup_seconds=$(agent_input @agent-status-followup-bell-seconds 30)
+case "$agent_followup_seconds" in
+    ''|*[!0-9]*) agent_warn '@agent-status-followup-bell-seconds must be a whole number of seconds'; exit 1 ;;
+esac
 agent_relay=$(agent_input @agent-status-relay off)
 agent_relay_count=$(agent_input @agent-status-relay-count off)
 for agent_value in "$agent_relay" "$agent_relay_count"; do
@@ -190,6 +196,7 @@ agent_style_color() {
 }
 
 # Resolved defaults never overwrite user input options.
+agent_tmux set-option -g @agent-status-internal-followup-bell-seconds "$agent_followup_seconds"
 agent_tmux set-option -g @agent-status-internal-running-icon "$agent_running_icon"
 agent_tmux set-option -g @agent-status-internal-bell-icon "$agent_bell_icon"
 agent_tmux set-option -g @agent-status-internal-stale-icon "$agent_stale_icon"

@@ -330,6 +330,18 @@ class Integration(unittest.TestCase):
         sent = re.sub(rb"\x1b\][^\x07]*\x07", b"", bytes(output[start:]))
         self.assertIn(b"\x07", sent)
 
+    def test_followup_bell_seconds_option(self):
+        key = "@agent-status-internal-followup-bell-seconds"
+        self.s.load()
+        self.assertEqual("30", self.s.option(key))
+        self.s.tm("set-option", "-g", "@agent-status-followup-bell-seconds", "0")
+        self.s.load()
+        self.assertEqual("0", self.s.option(key))
+        self.s.tm("set-option", "-g", "@agent-status-followup-bell-seconds", "soon")
+        r = self.s.load(check=False)
+        self.assertNotEqual(0, r.returncode)
+        self.assertIn("whole number", r.stderr)
+
     def test_completion_bell_skips_titles_from_non_agents(self):
         self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
         self.s.load()

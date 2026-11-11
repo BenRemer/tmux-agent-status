@@ -53,6 +53,13 @@ alongside your other settings (wrap it in `{ }` if the file is new):
 "preferredNotifChannel": "terminal_bell"
 ```
 
+When a background command or agent finishes after Claude's turn has ended,
+Claude starts a follow-up turn on its own. That turn notifies only if it ends
+at least `@agent-status-followup-bell-seconds` (default 30) after the previous
+turn, so a quick background command doesn't notify twice; long background work
+still notifies when it's done. Set it to `0` to notify for every follow-up.
+Turns that start from a prompt you type always notify.
+
 The fallback bell rings in the window you are viewing only after a turn of at
 least 10 seconds, the same rule as the plugin's completion bell. A completion
 bell creates an unread marker only if the notified window is not currently

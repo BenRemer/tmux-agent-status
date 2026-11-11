@@ -2,6 +2,13 @@
 const activeTurns = new Set();
 let connection;
 let reported;
+// A finished background task's notification starts a follow-up turn of its
+// own once Claude is idle. That turn rings again only when it ends long enough
+// after the previous turn, so a quick background command does not ring twice.
+let followUpPending = false;
+const followUpTurns = new Set();
+let lastCompletedAt;
+const DEFAULT_FOLLOWUP_BELL_SECONDS = 30;
 
 async function reportActivity($, busy) {
   try {
@@ -30,7 +37,24 @@ async function reportActivity($, busy) {
 // Claude's channels that write BEL, which tmux turns into a window bell.
 const BELL_CHANNELS = new Set(['terminal_bell', 'iterm2_with_bell']);
 
-async function notifyCompletion($, target, elapsedMs) {
+// The follow-up quiet period, from the plugin's option (0 always rings).
+async function followUpSeconds($, target) {
+  try {
+    const info = await $.process.run([
+      'tmux', '-S', target.socket,
+      'display-message', '-p', '-t', target.pane,
+      '#{@agent-status-internal-followup-bell-seconds}',
+    ]);
+    const value = info.exitCode === 0 ? info.stdout.trim() : '';
+    return /^[0-9]+$/.test(value) ? Number(value) : DEFAULT_FOLLOWUP_BELL_SECONDS;
+  } catch {
+    return DEFAULT_FOLLOWUP_BELL_SECONDS;
+  }
+}
+
+async function notifyCompletion($, target, elapsedMs, sincePreviousMs) {
+  if (sincePreviousMs !== undefined &&
+      sincePreviousMs < (await followUpSeconds($, target)) * 1000) return;
   let result;
   try {
     result = await $.ui.notify('Task complete');
@@ -76,14 +100,26 @@ async function ringPaneBell($, target, elapsedMs) {
 export function register(on) {
   on('session.start', async ($, e, next) => {
     activeTurns.clear();
+    followUpTurns.clear();
+    followUpPending = false;
+    lastCompletedAt = undefined;
     reported = undefined;
     connection = e.surface === 'terminal' && e.isInteractive ? undefined : null;
     await reportActivity($, false);
     return next(e);
   });
 
+  on('prompt.submit', async ($, e, next) => {
+    // Only a submission while idle starts a turn; one delivered into a running
+    // turn (turnId set) joins it.
+    if (!e.turnId) followUpPending = e.origin?.kind === 'task-notification';
+    return next(e);
+  });
+
   on('turn.start', async ($, e, next) => {
     if (!e.agentId) {
+      if (followUpPending) followUpTurns.add(e.turnId);
+      followUpPending = false;
       activeTurns.add(e.turnId);
       await reportActivity($, true);
     }
@@ -93,11 +129,17 @@ export function register(on) {
   on('turn.complete', async ($, e, next) => {
     if (!e.agentId) {
       const wasActive = activeTurns.delete(e.turnId);
+      const followUp = followUpTurns.delete(e.turnId);
       await reportActivity($, activeTurns.size > 0);
-      if (connection && wasActive && activeTurns.size === 0 && !e.isAborted) {
-        // Never delay completion for a notification, and never notify for
-        // cancellation or child turns.
-        notifyCompletion($, connection, e.durationMs).catch(() => {});
+      if (wasActive && activeTurns.size === 0) {
+        const now = await $.clock.now();
+        const since = followUp && lastCompletedAt !== undefined ? now - lastCompletedAt : undefined;
+        lastCompletedAt = now;
+        if (connection && !e.isAborted) {
+          // Never delay completion for a notification, and never notify for
+          // cancellation or child turns.
+          notifyCompletion($, connection, e.durationMs, since).catch(() => {});
+        }
       }
     }
     return next(e);
@@ -105,6 +147,7 @@ export function register(on) {
 
   on('session.end', async ($, e, next) => {
     activeTurns.clear();
+    followUpTurns.clear();
     await reportActivity($, false);
     return next(e);
   });

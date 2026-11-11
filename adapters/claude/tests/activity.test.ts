@@ -4,6 +4,7 @@ function setup(on, env = { TMUX: '/tmp/socket with spaces,and commas,321,0', TMU
   const writes = []
   const notifications = []
   mock.env(on, env)
+  mock.clock(on)
   on('process.run', ($, e) => {
     writes.push(e.argv)
     return { value: { exitCode: 0, stdout: '', stderr: '' } }
@@ -73,6 +74,7 @@ test('noninteractive runs cannot overwrite the parent terminal state', async ($,
 
 test('an unavailable tmux server does not interrupt event handling', async ($, on) => {
   mock.env(on, { TMUX: '/tmp/gone,321,0', TMUX_PANE: '%42' })
+  mock.clock(on)
   let completions = 0
   on('process.run', () => ({ value: { exitCode: 1, stdout: '', stderr: 'no server' } }))
   on('session.start', () => ({ cwd: '/tmp' }))
@@ -96,6 +98,7 @@ test('main completion notifies once even when the event is repeated', async ($, 
 
 test('a refused notification does not prevent turn completion', async ($, on) => {
   mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
+  mock.clock(on)
   let completions = 0
   on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }))
   on('ui.notify', () => ({ deny: 'notifications disabled for this test' }))
@@ -111,6 +114,7 @@ test('a refused notification does not prevent turn completion', async ($, on) =>
 function bellSetup(on, notifyResult, viewed = false, seconds = '10') {
   const commands = []
   mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
+  mock.clock(on)
   on('process.run', ($, e) => {
     commands.push(e.argv)
     const stdout = e.argv.includes('display-message') ? `${viewed ? 1 : 0} ${seconds} /dev/ttys004\n` : ''
@@ -184,4 +188,71 @@ test('notifications_disabled is respected', async ($, on) => {
   const commands = bellSetup(on, { isSent: false, reason: 'disabled' })
   await completeOneTurn($)
   expect(commands.length).toBe(3)
+})
+
+function followUpSetup(on, seconds = '') {
+  const commands = []
+  const notifications = []
+  mock.env(on, { TMUX: '/tmp/socket,321,0', TMUX_PANE: '%42' })
+  const clock = mock.clock(on)
+  on('process.run', ($, e) => {
+    commands.push(e.argv)
+    const format = e.argv[e.argv.length - 1]
+    const stdout = format === '#{@agent-status-internal-followup-bell-seconds}' ? `${seconds}\n` : ''
+    return { value: { exitCode: 0, stdout, stderr: '' } }
+  })
+  on('ui.notify', ($, e) => {
+    notifications.push(e.text)
+    return { value: { isSent: true, channel: 'terminal_bell' } }
+  })
+  on('session.start', () => ({ cwd: '/tmp' }))
+  on('prompt.submit', ($, e) => ({ text: e.text }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
+  return { commands, notifications, clock }
+}
+
+async function settle() {
+  for (let i = 0; i < 20; i += 1) await Promise.resolve()
+}
+
+async function turn($, turnId, kind) {
+  if (kind) await $.prompt.submit({ text: 'notice', origin: { kind }, wait: false })
+  await $.turn.start({ turnId })
+  await $.turn.complete({ turnId, isAborted: false, answer: 'Done', durationMs: 1 })
+  await settle()
+}
+
+test('a follow-up turn soon after the previous one does not ring again', async ($, on) => {
+  const { notifications, clock } = followUpSetup(on)
+  await $.session.start(terminal)
+  await turn($, 'first')
+  await clock.advance(29000)
+  await turn($, 'follow-up', 'task-notification')
+  expect(notifications).toEqual(['Task complete'])
+})
+
+test('a follow-up turn after the quiet period rings', async ($, on) => {
+  const { notifications, clock } = followUpSetup(on)
+  await $.session.start(terminal)
+  await turn($, 'first')
+  await clock.advance(30000)
+  await turn($, 'follow-up', 'task-notification')
+  expect(notifications).toEqual(['Task complete', 'Task complete'])
+})
+
+test('a prompt the user types always rings, however soon', async ($, on) => {
+  const { notifications } = followUpSetup(on)
+  await $.session.start(terminal)
+  await turn($, 'first')
+  await turn($, 'second', 'composer')
+  expect(notifications).toEqual(['Task complete', 'Task complete'])
+})
+
+test('the quiet period comes from the plugin option, and 0 always rings', async ($, on) => {
+  const { notifications } = followUpSetup(on, '0')
+  await $.session.start(terminal)
+  await turn($, 'first')
+  await turn($, 'follow-up', 'task-notification')
+  expect(notifications).toEqual(['Task complete', 'Task complete'])
 })

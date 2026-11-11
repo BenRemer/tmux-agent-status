@@ -310,6 +310,7 @@ Set options before the plugin loads, then reload to apply them.
 | `@agent-status-running-style` | Inherit in manual mode; soft teal in compact mode |
 | `@agent-status-bell-style` | Inherit in manual mode; amber in compact mode |
 | `@agent-status-completion-bell` | `on`; rings a tab's bell when its agent's busy title turns idle |
+| `@agent-status-followup-bell-seconds` | `30`; Claude adapter: a turn Claude starts on its own after a background task finishes rings only if it ends at least this long after the previous turn. `0` always rings. |
 | `@agent-status-stale-icon` | From `@agent-status-icons`: a broken link (U+F127, `nf-fa-chain_broken`), or ⚠ for `emoji` |
 | `@agent-status-stale-style` | Inherit in manual mode; muted red in compact mode |
 | `@agent-status-relay` | `off`; on a remote tmux, publish its agents to the local tmux over SSH |

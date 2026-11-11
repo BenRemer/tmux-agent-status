@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The Claude adapter no longer notifies twice for a quick background task. A
+  follow-up turn that Claude starts after a background task finishes notifies
+  only if it ends at least `@agent-status-followup-bell-seconds` (default 30)
+  after the previous turn.
 - The completion bell, and the Claude adapter's fallback bell, ring for the
   window you are viewing only after a turn of at least 10 seconds. tmux passes
   those bells straight to the terminal, so starting Codex flashed the screen
