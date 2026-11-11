@@ -26,7 +26,7 @@ def check(root=ROOT):
     if not (root / "agent-status.tmux").stat().st_mode & 0o111:
         errors.append("agent-status.tmux must be executable")
     for path in root.rglob("*.md"):
-        if any(part in {".git", ".venv", "dist", "node_modules", ".test-results"}
+        if any(part in {".git", ".venv", "node_modules"}
                for part in path.relative_to(root).parts):
             continue
         text = path.read_text()

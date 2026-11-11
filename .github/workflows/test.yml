@@ -4,7 +4,6 @@ on:
     branches: [main, dev]
   pull_request:
   workflow_dispatch:
-  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -62,6 +61,10 @@ jobs:
               awk 'BEGIN { printf "::error title=integration::" } { printf "%s%%0A", $0 } END { print "" }'
             exit 1
           fi
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Version metadata and documentation links
         run: python3 tools/check_docs.py
   claude-adapter:
