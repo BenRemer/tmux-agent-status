@@ -18,8 +18,12 @@ jobs:
             tmux: '3.5a'
           - os: ubuntu-latest
             tmux: '3.6a'
+          - os: ubuntu-latest
+            tmux: '3.8'
           - os: macos-latest
             tmux: '3.6a'
+          - os: macos-latest
+            tmux: '3.8'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

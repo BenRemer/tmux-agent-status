@@ -6,6 +6,7 @@ const activeTurns = new Set();
 const childTurns = new Set();
 let connection;
 let reported;
+let activityUpdate = Promise.resolve();
 // A finished background task's notification starts a follow-up turn of its
 // own once Claude is idle. That turn rings again only when it ends long enough
 // after the previous turn, so a quick background command does not ring twice.
@@ -16,7 +17,14 @@ const DEFAULT_FOLLOWUP_BELL_SECONDS = 30;
 
 const isBusy = () => activeTurns.size > 0 || childTurns.size > 0;
 
-async function reportActivity($, busy) {
+function reportActivity($) {
+  // Child events can overlap while a tmux command is pending. Serialize the
+  // writes and read the current turn state when each queued update starts.
+  activityUpdate = activityUpdate.then(() => writeActivity($));
+  return activityUpdate;
+}
+
+async function writeActivity($) {
   try {
     if (connection === undefined) {
       const tmux = await $.env.get('TMUX');
@@ -26,6 +34,7 @@ async function reportActivity($, busy) {
         ? { socket: match[1], pane }
         : null;
     }
+    const busy = isBusy();
     if (!connection || reported === busy) return;
     // Record the pane's own foreground command, since a launcher such as
     // toolbox-exec can run Claude under another name.
@@ -112,7 +121,7 @@ export function register(on) {
     lastCompletedAt = undefined;
     reported = undefined;
     connection = e.surface === 'terminal' && e.isInteractive ? undefined : null;
-    await reportActivity($, false);
+    await reportActivity($);
     return next(e);
   });
 
@@ -133,18 +142,18 @@ export function register(on) {
       followUpPending = false;
       activeTurns.add(e.turnId);
     }
-    await reportActivity($, true);
+    await reportActivity($);
     return next(e);
   });
 
   on('turn.complete', async ($, e, next) => {
     if (e.agentId) {
       // A subagent's own completion only stops showing its work.
-      if (childTurns.delete(e.turnId)) await reportActivity($, isBusy());
+      if (childTurns.delete(e.turnId)) await reportActivity($);
     } else {
       const wasActive = activeTurns.delete(e.turnId);
       const followUp = followUpTurns.delete(e.turnId);
-      await reportActivity($, isBusy());
+      await reportActivity($);
       if (wasActive && activeTurns.size === 0) {
         const now = await $.clock.now();
         const since = followUp && lastCompletedAt !== undefined ? now - lastCompletedAt : undefined;
@@ -163,7 +172,7 @@ export function register(on) {
     activeTurns.clear();
     childTurns.clear();
     followUpTurns.clear();
-    await reportActivity($, false);
+    await reportActivity($);
     return next(e);
   });
 }

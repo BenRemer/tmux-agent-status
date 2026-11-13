@@ -27,15 +27,15 @@ it falls back to wrapping the tab and appending the icon.
 | `@agent-status-running-icon` | `⚙` | `⚙` |
 | `@agent-status-bell-icon` | <img src="images/bell.png" alt="bell" height="16"> (U+F0F3) | <img src="images/bell.png" alt="bell" height="16"> (U+F0F3) |
 | `@agent-status-stale-icon` | Broken link (U+F127) | Broken link (U+F127) |
+| `@agent-status-running-style` | Inherit | `bg=#30464b,fg=#cad3f5` |
+| `@agent-status-bell-style` | Inherit | `bg=#eed49f,fg=#181926,bold` |
+| `@agent-status-stale-style` | Inherit | `bg=#4b3036,fg=#f0c6c6` |
 
 The default bell is the Nerd Font bell <img src="images/bell.png" alt="bell" height="16"> (U+F0F3, `nf-fa-bell`), which is text-sized
 like the cog. `@agent-status-icons 'emoji'` uses 🔔 instead, for terminals
 without a Nerd Font; emoji usually render two cells wide. Explicit icon inputs
 override either set. tmux cannot query the terminal's font, so the plugin
 cannot detect which set will display.
-| `@agent-status-running-style` | Inherit | `bg=#30464b,fg=#cad3f5` |
-| `@agent-status-bell-style` | Inherit | `bg=#eed49f,fg=#181926,bold` |
-| `@agent-status-stale-style` | Inherit | `bg=#4b3036,fg=#f0c6c6` |
 
 Style inputs affect the corner indicators and compact preset accents.
 Window and session text tokens inherit the surrounding style. To add manual

@@ -1,5 +1,5 @@
 #!/bin/sh
-# TPM entry point. All shell work happens at load time.
+# TPM entry point. Resolve configuration and install tmux formats and hooks.
 set -eu
 
 agent_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -239,6 +239,13 @@ if [ "$agent_completion_bell" = on ]; then
     agent_tmux set-hook -g "$agent_hook" "if-shell -F '#{&&:#{@agent-status-internal-busy-pattern},#{m/r:#{@agent-status-internal-busy-pattern},#{pane_title}}}' { if-shell -F '#{?#{@agent-status-internal-title-busy},0,#{E:@agent-status-internal-pane}}' { set-option -pF @agent-status-internal-title-busy '#{T:@agent-status-internal-now}' } } { if-shell -F '#{@agent-status-internal-title-busy}' { if-shell -F '#{E:@agent-status-internal-bell-due}' { run-shell -b \"printf '\\\\a' > '#{pane_tty}'\" } ; set-option -pu @agent-status-internal-title-busy } }"
 else
     agent_tmux set-hook -gu "$agent_hook"
+    # A turn that finishes while the hook is disabled must not ring after
+    # the hook is enabled again. Keep adapter activity markers intact.
+    agent_tmux list-panes -a -F '#{?#{@agent-status-internal-title-busy},#{pane_id},}' |
+        while IFS= read -r agent_pane; do
+            [ -n "$agent_pane" ] || continue
+            agent_tmux set-option -pu -t "$agent_pane" @agent-status-internal-title-busy 2>/dev/null || :
+        done
 fi
 
 # Shared functions and socket selection stay in this process.

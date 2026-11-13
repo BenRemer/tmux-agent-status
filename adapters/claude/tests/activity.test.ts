@@ -109,6 +109,94 @@ test('old completion cannot clear a newer active turn; normal completion and exi
   expect(notifications).toEqual(['Task complete'])
 })
 
+function pendingActivitySetup(on) {
+  mock.env(on, { TMUX: '/tmp/socket,123,0', TMUX_PANE: '%1' })
+  mock.clock(on)
+  const writes = []
+  let state = ''
+  let pendingValue
+  let release
+  let entered
+  on('process.run', async ($, e) => {
+    const value = e.argv[e.argv.length - 1]
+    writes.push(value)
+    if (value === pendingValue) {
+      pendingValue = undefined
+      entered()
+      await new Promise(resolve => { release = resolve })
+    }
+    state = value
+    return { value: { exitCode: 0, stdout: '', stderr: '' } }
+  })
+  on('session.start', () => ({ cwd: '/tmp' }))
+  on('session.end', ($, e) => ({ sessionId: e.sessionId }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
+  return {
+    writes,
+    state: () => state,
+    hold: (value) => {
+      pendingValue = value
+      return new Promise(resolve => { entered = resolve })
+    },
+    release: () => release(),
+  }
+}
+
+test('a child starting during an idle write leaves the pane busy', async ($, on) => {
+  const activity = pendingActivitySetup(on)
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'old', agentId: 'a' })
+  const waiting = activity.hold('')
+  const ending = $.turn.complete({ turnId: 'old', agentId: 'a', isAborted: false, answer: '', durationMs: 1 })
+  await waiting
+  const starting = $.turn.start({ turnId: 'new', agentId: 'b' })
+  await settle()
+  activity.release()
+  await Promise.all([ending, starting])
+  expect(activity.state()).toBe('#{pane_current_command}')
+  await $.turn.complete({ turnId: 'new', agentId: 'b', isAborted: false, answer: '', durationMs: 1 })
+  expect(activity.state()).toBe('')
+})
+
+test('session exit during a busy write clears the pane after that write', async ($, on) => {
+  const activity = pendingActivitySetup(on)
+  await $.session.start(terminal)
+  const waiting = activity.hold('#{pane_current_command}')
+  const starting = $.turn.start({ turnId: 'child', agentId: 'a' })
+  await waiting
+  const ending = $.session.end({ sessionId: 'session', reason: 'prompt_input_exit' })
+  await settle()
+  activity.release()
+  await Promise.all([starting, ending])
+  expect(activity.state()).toBe('')
+  expect(activity.writes).toEqual(['', '#{pane_current_command}', ''])
+})
+
+test('a failed activity write does not block later updates', async ($, on) => {
+  mock.env(on, { TMUX: '/tmp/socket,123,0', TMUX_PANE: '%1' })
+  const writes = []
+  let rejectBusy = true
+  on('process.run', ($, e) => {
+    const value = e.argv[e.argv.length - 1]
+    if (rejectBusy && value === '#{pane_current_command}') {
+      rejectBusy = false
+      throw new Error('tmux temporarily unavailable')
+    }
+    writes.push(value)
+    return { value: { exitCode: 0, stdout: '', stderr: '' } }
+  })
+  on('session.start', () => ({ cwd: '/tmp' }))
+  on('session.end', ($, e) => ({ sessionId: e.sessionId }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'old', agentId: 'a' })
+  await $.turn.start({ turnId: 'new', agentId: 'b' })
+  expect(writes).toEqual(['', '#{pane_current_command}'])
+  await $.session.end({ sessionId: 'session', reason: 'prompt_input_exit' })
+  expect(writes).toEqual(['', '#{pane_current_command}', ''])
+})
+
 test('no tmux connection means no process is started', async ($, on) => {
   const { writes, notifications } = setup(on, {})
   await $.session.start(terminal)

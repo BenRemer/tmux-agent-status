@@ -30,9 +30,10 @@ cog. If your terminal font is not a Nerd Font and the bell shows as a box, set
 A bell takes priority over the running icon on a tab. Both can appear in the
 corner. Your selected tab keeps its normal highlight while working.
 
-No daemon, transcript scraping, model requests, or shell polling during status
-refreshes. The core uses native tmux formats; optional adapters report Claude
-turn events or Antigravity's activity title.
+No daemon, transcript scraping, or model requests. Local activity detection
+uses native tmux formats. Remote relay freshness uses a cached clock command
+during status refreshes. Optional adapters report Claude turn events or
+Antigravity's activity title.
 
 Requires **tmux 3.4+**, on Linux or macOS. This is a beta: options may still
 change between releases.

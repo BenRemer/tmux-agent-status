@@ -130,7 +130,7 @@ class Server:
             raise AssertionError(f"tmux {args}: {r.stderr}")
         return r.stdout.strip()
 
-    def load(self, mode=None, check=True, via_tmux=False, real_clock=False):
+    def load(self, mode=None, check=True, via_tmux=False):
         if mode is not None:
             self.tm("set-option", "-g", "@agent-status-preset", mode)
         if via_tmux:
@@ -141,11 +141,6 @@ class Server:
                                env=self.env, capture_output=True, text=True, timeout=10)
             if check and r.returncode:
                 raise AssertionError(r.stderr)
-        if not real_clock:
-            # The relay clock is a #() job, and display-message never runs
-            # jobs. Formats evaluated here read the time directly instead.
-            self.tm("set-option", "-g", "@agent-status-internal-clock",
-                    "#{T:@agent-status-internal-now}")
         return r
 
     def attach(self, target):
@@ -362,6 +357,34 @@ class Integration(unittest.TestCase):
         self.s.load()
         self.assertNotIn("[4721]", self.s.tm("show-hooks", "-g", "pane-title-changed"))
 
+    def test_completion_bell_off_clears_pending_turns(self):
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.load()
+        panes = [self.s.agent(), self.s.agent("B:1")]
+        for pane in panes:
+            self.s.busy(pane)
+            self.assertNotEqual("", self.s.eval(pane, "#{@agent-status-internal-title-busy}"))
+        # Disabling title bells must leave adapter activity untouched.
+        self.s.tm("set-option", "-p", "-t", panes[0], "@agent-status-busy-command", "codex")
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "off")
+        self.s.load()
+        for pane in panes:
+            self.assertEqual("", self.s.eval(pane, "#{@agent-status-internal-title-busy}"))
+            self.s.busy(pane, False)
+            self.assertEqual("0", self.s.eval(pane, "#{window_bell_flag}"))
+        self.assertEqual("codex", self.s.eval(panes[0], "#{@agent-status-busy-command}"))
+        self.s.tm("set-option", "-g", "@agent-status-completion-bell", "on")
+        self.s.load()
+        for pane in panes:
+            self.s.emit(pane, "\x1b]2;Another idle title\x07")
+        time.sleep(.2)
+        for pane in panes:
+            self.assertEqual("0", self.s.eval(pane, "#{window_bell_flag}"))
+        # A new turn after enabling bells still rings normally.
+        self.s.busy(panes[0])
+        self.s.busy(panes[0], False)
+        self.assertEqual("1", self.wait_for(panes[0], "#{window_bell_flag}", "1"))
+
     def test_uninstall_removes_everything_the_plugin_set(self):
         formats = {key: self.s.option(key) for key in
                    ("window-status-format", "window-status-current-format", "status-right")}
@@ -412,6 +435,56 @@ class Integration(unittest.TestCase):
         self.s.load()
         self.assertEqual("DEV #S", self.s.option("set-titles-string"))
         self.assertEqual("off", self.s.option("set-titles"))
+
+    def test_relay_counts_linked_windows_once(self):
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        self.s.load()
+        a = self.s.agent()
+        self.s.busy(a)
+        self.s.tm("link-window", "-d", "-s", a, "-t", "B:1")
+        self.s.tm("link-window", "-d", "-s", a, "-t", "B:2")
+        self.s.emit(a, "\a")
+        title = "#{T:set-titles-string}"
+        self.assertRegex(self.s.eval("A:0", title), r"^agents 1/1 !1 ~[0-9]+$")
+        # Names and link order must not affect identity or counts.
+        self.s.tm("rename-session", "-t", "A", "B,comma $()")
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 1/1 !1 ~[0-9]+$")
+        self.s.tm("unlink-window", "-t", "B:2")
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 1/1 !1 ~[0-9]+$")
+        # Keep two links in a single session; recent tmux versions report
+        # window_linked_sessions=1 here despite the duplicate window links.
+        self.s.tm("link-window", "-d", "-s", a, "-t", "B:2")
+        self.s.tm("unlink-window", "-t", "B,comma $():1")
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 1/1 !1 ~[0-9]+$")
+        other = self.s.agent("B:3")
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 1/2 !1 ~[0-9]+$")
+        self.s.busy(other)
+        self.assertRegex(self.s.eval("B:0", title), r"^agents 2/2 !1 ~[0-9]+$")
+
+    def test_relay_counts_bells_that_new_links_do_not_inherit(self):
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        self.s.load()
+        a = self.s.agent()
+        self.s.busy(a)
+        self.s.emit(a, "\a")
+        self.s.tm("link-window", "-d", "-s", a, "-t", "B:1")
+        self.assertEqual("1", self.s.eval("A:1", "#{window_bell_flag}"))
+        self.assertEqual("0", self.s.eval("B:1", "#{window_bell_flag}"))
+        self.assertRegex(self.s.eval("B:0", "#{T:set-titles-string}"),
+                         r"^agents 1/1 !1 ~[0-9]+$")
+
+    def test_relay_counts_many_linked_windows_without_truncation(self):
+        # Rebuilding the link table inside every window's format exceeds
+        # tmux 3.8's expansion time limit at this size and truncates the title.
+        self.s.tm("set-option", "-g", "@agent-status-relay", "on")
+        self.s.load()
+        for index in range(1, 41):
+            pane = self.s.agent(f"A:{index}")
+            self.s.tm("link-window", "-d", "-s", pane, "-t", f"B:{index}")
+            self.s.busy(pane)
+            self.s.emit(pane, "\a")
+        self.assertRegex(self.s.eval("A:0", "#{T:set-titles-string}"),
+                         r"^agents 40/40 !40 ~[0-9]+$")
 
     def test_relay_keeps_non_ascii_titles_without_a_utf8_locale(self):
         original = "✳ #S ⠋"
@@ -464,8 +537,10 @@ class Integration(unittest.TestCase):
         self.assertLess(corner.index(STALE), corner.index(BELL))
 
     def test_relay_clock_job_renders_in_the_status_line(self):
-        self.s.load(real_clock=True)
-        self.s.tm("set-option", "-g", "status-right", "[#{E:@agent-status-internal-clock}]")
+        self.s.load("compact")
+        a = self.s.agent(name="ssh")
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 2, age=90, bells=1)}\x07")
+        self.s.tm("set-option", "-g", "status-right", "[#{E:@agent-status-internal-clock-job}]")
         self.s.attach("A:0")
         output = self.s.clients[-1][3]
         for _ in range(60):
@@ -475,6 +550,37 @@ class Integration(unittest.TestCase):
             time.sleep(.1)
         self.assertTrue(found, bytes(output)[-300:])
         self.assertLess(abs(int(found[-1]) - time.time()), 5)
+        self.assertIn(STALE.encode(), bytes(output))
+
+    def test_relay_queries_use_the_clock_when_jobs_are_disabled(self):
+        self.s.load()
+        a = self.s.agent(name="ssh")
+        state = ("#{E:@agent-status-window-busy}|#{E:@agent-status-window-bell}|"
+                 "#{E:@agent-status-window-stale}")
+        for age, expected in ((0, "1|1|0"), (90, "0|0|1"), (0, "1|1|0")):
+            with self.subTest(age=age):
+                self.s.emit(a, f"\x1b]2;{self.relay_title(1, 2, age=age, bells=1)}\x07")
+                self.assertEqual(expected, self.s.eval(a, state))
+                self.assertEqual(expected, self.s.tm("list-panes", "-t", a, "-F", state))
+        # display-message disables jobs even after a client's cache is warm.
+        self.s.attach("A:0")
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 2, age=90, bells=1)}\x07")
+        self.assertEqual("0|0|1", self.s.eval(a, state))
+
+    def test_dead_relay_panes_are_ignored(self):
+        self.s.load()
+        a = self.s.agent(name="ssh")
+        self.s.tm("set-option", "-w", "-t", a, "remain-on-exit", "on")
+        self.s.emit(a, f"\x1b]2;{self.relay_title(1, 2, bells=1)}\x07")
+        self.assertEqual("1", self.s.eval(a, "#{E:@agent-status-window-busy}"))
+        self.s.tm("send-keys", "-t", a, "C-d")
+        self.assertEqual("1", self.wait_for(a, "#{pane_dead}", "1"))
+        for flag in ("busy", "bell", "stale"):
+            self.assertEqual("0", self.s.eval(a, f"#{{E:@agent-status-window-{flag}}}"))
+        self.assertEqual("", self.s.eval("B:0", OTHER))
+        # A stale title on a dead pane must not leave a permanent stale badge.
+        self.s.tm("select-pane", "-t", a, "-T", self.relay_title(1, 2, age=90))
+        self.assertEqual("0", self.s.eval(a, "#{E:@agent-status-window-stale}"))
 
     def test_relay_title_is_ignored_outside_ssh(self):
         a = self.s.agent()  # codex, not ssh
