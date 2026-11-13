@@ -3,7 +3,11 @@
 Recent Claude Code versions keep their terminal title static inside tmux, so
 title matching cannot detect active work. This optional Claude mod reports
 main-turn start, completion (including cancellation), and session exit to a
-pane-local tmux option. Subagent events do not clear the main turn's marker.
+pane-local tmux option. Subagents count as work too, so the cog stays on while
+a workflow's agents keep running after the main turn ends; their completion
+never clears the main turn's marker and never rings. A background shell command
+is the one gap: Claude reports no event for it, so a tab whose only remaining
+work is a background command shows no cog until the follow-up turn starts.
 Normal main-turn completion rings the tmux bell. The adapter uses Claude's
 notification channel, or rings the bell itself when that channel cannot reach
 tmux. See [Bells](#bells-and-preferrednotifchannel). Cancellation and subagent
@@ -52,6 +56,18 @@ alongside your other settings (wrap it in `{ }` if the file is new):
 ```json
 "preferredNotifChannel": "terminal_bell"
 ```
+
+Use `terminal_bell` if you approve tool permissions by hand: with `auto`, a
+tab waiting on a permission prompt or an MCP input request keeps its cog and
+never rings. If Claude rarely asks you anything (for example in auto mode),
+`auto` is enough and gives exactly one bell per finished turn.
+
+With `terminal_bell`, Claude also rings its idle reminder ("Claude is waiting
+for your input") about 60 seconds after a turn ends, so one turn can ring
+twice. Claude sends that reminder itself, outside the mods API, and hooks
+cannot cancel it, so the adapter cannot suppress it. To skip it, set
+`"messageIdleNotifThresholdMs": 86400000` (24 hours) at the top level of
+`~/.claude.json`, Claude's global config file, and restart Claude.
 
 When a background command or agent finishes after Claude's turn has ended,
 Claude starts a follow-up turn on its own. That turn notifies only if it ends

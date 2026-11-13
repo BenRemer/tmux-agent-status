@@ -7,7 +7,7 @@ working in another session, and come back when a tab has something for you.
 
 [![Tests](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml/badge.svg)](https://github.com/benremer/tmux-agent-status/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Beta](https://img.shields.io/badge/release-beta-d29922.svg)](CHANGELOG.md)
+[![Beta](https://img.shields.io/badge/release-beta-d29922.svg)](https://github.com/benremer/tmux-agent-status/releases)
 
 ![A selected shell tab, softly highlighted working agent tabs, an amber notification tab, and indicators for other sessions](docs/images/overview.png)
 
@@ -118,7 +118,9 @@ If that destination already exists, inspect it instead of overwriting it.
 Restart/resume Claude. It may show its normal plugin trust prompt.
 
 The adapter shows the cog while the main turn runs. It rings the bell when the
-main turn finishes. Cancellation and subagent completion do not ring. It does
+main turn finishes. The cog also covers subagents, so it stays on while a
+workflow's agents run after the main turn has ended.
+Cancellation and subagent completion do not ring. It does
 nothing outside an interactive tmux session.
 
 **2. Recommended: set Claude's notification channel to the terminal bell.**
@@ -142,6 +144,24 @@ This setting decides how the bell reaches tmux:
 Without `terminal_bell`, Claude's own notifications never reach tmux. For
 example, a tab waiting on a permission prompt gets no bell. The adapter only
 covers turn completion, so set `terminal_bell` to get both.
+
+Which to choose:
+
+- **`terminal_bell`** if you approve tool permissions by hand. Permission
+  prompts, MCP input requests, and other Claude notifications ring, so a
+  tab waiting on you gets a bell instead of just a cog.
+- **`auto`** if Claude rarely asks you anything, for example in auto mode.
+  You get one bell per finished turn and nothing else, with no setup.
+
+`terminal_bell` also brings Claude's idle reminder: about 60 seconds after a
+turn ends, Claude rings again if you haven't typed. That second bell is
+Claude's, and the adapter cannot stop it. To skip it, raise the delay with
+this top-level key in `~/.claude.json` (Claude's global config file, not
+`settings.json`), then restart Claude:
+
+```json
+"messageIdleNotifThresholdMs": 86400000
+```
 
 The adapter needs a Claude Code version with mods support (2.1.314 or later).
 See [adapter details](adapters/claude/README.md) for one-session loading,
@@ -336,8 +356,7 @@ empty overrides, and integration rules.
 ## Upgrade or uninstall
 
 Upgrade TPM installations with **prefix + U**. For a manual checkout, fetch
-tags and check out the desired release, then reload your tmux config. Read the
-[changelog](CHANGELOG.md) before upgrading a beta.
+tags and check out the desired release, then reload your tmux config.
 
 To uninstall, run this **while the plugin is still installed**:
 

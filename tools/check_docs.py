@@ -19,8 +19,6 @@ def check(root=ROOT):
         errors.append("Claude manifest version differs from VERSION")
     if manifest.get("license") != "MIT":
         errors.append("Claude manifest must declare the MIT license")
-    if f"## {version}" not in (root / "CHANGELOG.md").read_text():
-        errors.append("CHANGELOG.md has no entry for VERSION")
     if "MIT License" not in (root / "LICENSE").read_text():
         errors.append("Missing MIT license text")
     if not (root / "agent-status.tmux").stat().st_mode & 0o111:

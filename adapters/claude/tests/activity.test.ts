@@ -38,6 +38,61 @@ test('main turn reports busy, child completion does not clear it, cancellation d
   expect(notifications.length).toBe(0)
 })
 
+test('a subagent that outlives the main turn keeps the pane busy', async ($, on) => {
+  const { writes, notifications } = setup(on)
+  const busy = (write) => write[write.length - 1]
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'main' })
+  await $.turn.start({ turnId: 'child', agentId: 'child' })
+  // The Workflow tool returns at once, so the main turn ends first. It still
+  // rings, but the pane stays busy while the workflow's agents run.
+  await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs: 1 })
+  expect(writes.length).toBe(2)
+  expect(busy(writes[1])).toBe('#{pane_current_command}')
+  expect(notifications).toEqual(['Task complete'])
+  await $.turn.complete({ turnId: 'child', agentId: 'child', isAborted: false, answer: 'Done', durationMs: 1 })
+  expect(busy(writes[2])).toBe('')
+  // A finished subagent never rings by itself.
+  expect(notifications).toEqual(['Task complete'])
+})
+
+test('the last of several subagents clears the pane, and an abort still clears', async ($, on) => {
+  const { writes, notifications } = setup(on)
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'main' })
+  await $.turn.start({ turnId: 'a', agentId: 'a' })
+  await $.turn.start({ turnId: 'b', agentId: 'b' })
+  await $.turn.complete({ turnId: 'main', isAborted: false, answer: 'Done', durationMs: 1 })
+  await $.turn.complete({ turnId: 'a', agentId: 'a', isAborted: false, answer: 'Done', durationMs: 1 })
+  expect(writes.length).toBe(2)
+  await $.turn.complete({ turnId: 'b', agentId: 'b', isAborted: true, answer: '', durationMs: 1 })
+  expect(writes[2][writes[2].length - 1]).toBe('')
+  expect(notifications).toEqual(['Task complete'])
+})
+
+test('a subagent alone reports busy, and session exit clears it', async ($, on) => {
+  const { writes, notifications } = setup(on)
+  await $.session.start(terminal)
+  await $.turn.start({ turnId: 'child', agentId: 'child' })
+  expect(writes[1][writes[1].length - 1]).toBe('#{pane_current_command}')
+  expect(notifications.length).toBe(0)
+  await $.session.end({ sessionId: 'session', reason: 'prompt_input_exit' })
+  expect(writes[2][writes[2].length - 1]).toBe('')
+})
+
+test('a subagent running through a follow-up turn does not change its bell', async ($, on) => {
+  const { notifications, clock } = followUpSetup(on)
+  await $.session.start(terminal)
+  await turn($, 'first')
+  await $.turn.start({ turnId: 'child', agentId: 'child' })
+  await clock.advance(29000)
+  await turn($, 'follow-up', 'task-notification')
+  expect(notifications).toEqual(['Task complete'])
+  await $.turn.complete({ turnId: 'child', agentId: 'child', isAborted: false, answer: 'Done', durationMs: 1 })
+  await settle()
+  expect(notifications).toEqual(['Task complete'])
+})
+
 test('old completion cannot clear a newer active turn; normal completion and exit clear', async ($, on) => {
   const { writes, notifications } = setup(on)
   await $.session.start(terminal)

@@ -113,6 +113,15 @@ Changes to agent configuration may require restarting/resuming that agent.
 A bell in the window you are already viewing may show a transient message
 without leaving an unread flag. Visit a different window before testing.
 
+## Claude rings twice for one turn
+
+With `preferredNotifChannel` set to `terminal_bell`, the second bell about a
+minute after the turn ends is Claude's idle reminder, not the adapter. Raise
+`messageIdleNotifThresholdMs` in `~/.claude.json`; see the
+[adapter README](../adapters/claude/README.md#bells-and-preferrednotifchannel).
+A second bell soon after a background command finishes is a follow-up turn;
+see `@agent-status-followup-bell-seconds`.
+
 ## A bell seems to disappear
 
 The plugin uses native tmux window flags. Viewing that window acknowledges

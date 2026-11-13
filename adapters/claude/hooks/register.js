@@ -1,5 +1,9 @@
-// The main turn owns the pane. Subagent completion must not clear its activity.
+// The main turn owns the pane: only its completion rings, and a subagent's
+// completion must never clear its activity. Subagents still count as work,
+// because the Workflow and Agent tools keep running after the main turn ends;
+// without that the cog went out while a workflow was still going.
 const activeTurns = new Set();
+const childTurns = new Set();
 let connection;
 let reported;
 // A finished background task's notification starts a follow-up turn of its
@@ -9,6 +13,8 @@ let followUpPending = false;
 const followUpTurns = new Set();
 let lastCompletedAt;
 const DEFAULT_FOLLOWUP_BELL_SECONDS = 30;
+
+const isBusy = () => activeTurns.size > 0 || childTurns.size > 0;
 
 async function reportActivity($, busy) {
   try {
@@ -100,6 +106,7 @@ async function ringPaneBell($, target, elapsedMs) {
 export function register(on) {
   on('session.start', async ($, e, next) => {
     activeTurns.clear();
+    childTurns.clear();
     followUpTurns.clear();
     followUpPending = false;
     lastCompletedAt = undefined;
@@ -117,20 +124,27 @@ export function register(on) {
   });
 
   on('turn.start', async ($, e, next) => {
-    if (!e.agentId) {
+    if (e.agentId) {
+      // A subagent, including a background workflow's agents: work to show,
+      // but never a turn that rings.
+      childTurns.add(e.turnId);
+    } else {
       if (followUpPending) followUpTurns.add(e.turnId);
       followUpPending = false;
       activeTurns.add(e.turnId);
-      await reportActivity($, true);
     }
+    await reportActivity($, true);
     return next(e);
   });
 
   on('turn.complete', async ($, e, next) => {
-    if (!e.agentId) {
+    if (e.agentId) {
+      // A subagent's own completion only stops showing its work.
+      if (childTurns.delete(e.turnId)) await reportActivity($, isBusy());
+    } else {
       const wasActive = activeTurns.delete(e.turnId);
       const followUp = followUpTurns.delete(e.turnId);
-      await reportActivity($, activeTurns.size > 0);
+      await reportActivity($, isBusy());
       if (wasActive && activeTurns.size === 0) {
         const now = await $.clock.now();
         const since = followUp && lastCompletedAt !== undefined ? now - lastCompletedAt : undefined;
@@ -147,6 +161,7 @@ export function register(on) {
 
   on('session.end', async ($, e, next) => {
     activeTurns.clear();
+    childTurns.clear();
     followUpTurns.clear();
     await reportActivity($, false);
     return next(e);
