@@ -36,8 +36,9 @@ jobs:
       - name: macOS build dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install libevent ncurses utf8proc pkg-config bison shellcheck
-          echo "PKG_CONFIG_PATH=$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig" >> "$GITHUB_ENV"
+          # tmux 3.8 requires jemalloc on macOS unless explicitly disabled.
+          brew install libevent ncurses utf8proc jemalloc pkg-config bison shellcheck
+          echo "PKG_CONFIG_PATH=$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig:$(brew --prefix jemalloc)/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
           # tmux's configure refuses to guess on macOS without a utf8proc choice.
           echo "TMUX_CONFIGURE_FLAGS=--enable-utf8proc" >> "$GITHUB_ENV"
